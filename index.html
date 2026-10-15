@@ -206,7 +206,7 @@ html{scroll-behavior:smooth}
 <header class="topbar">
   <div class="brand">
     <h1>DASHBOARD DISTRI</h1>
-    <small>KPIs de choferes y operadores logísticos · versión 2026-10-15 09:50</small>
+    <small>KPIs de choferes y operadores logísticos · versión 2026-10-15 10:20</small>
   </div>
   <div class="fresh">
     <span id="freshText"><span class="dot off"></span>Sin datos cargados</span>
@@ -378,6 +378,7 @@ html{scroll-behavior:smooth}
 const CONFIG_DEF = {
   fecha_corte_nexus: '2026-09-28',
   modoMod: 'todas',
+  filtroInicial: 'no oficial',   /* cómo abre el filtro de rechazo: 'no oficial' u 'oficial' (hoja General) */
   claveFiltro: 'ROLITRANCO',   /* contraseña del filtro oficial / no oficial (hoja "Contraseña" de la configuración) */
   rmdDetractor: 2,     /* puntaje RMD igual o menor = detractor (1 y 2; 3 pasivo; 4 y 5 promotor) */
   modoViajes: 'taco',   /* 'dia': planilla por día · 'canal': por día y canal · 'segmento': por día y segmento */   /* 'todas': Mod Tot = cliente modulado (col. AP) · 'rechazo': solo filas con rechazo (Modulación Unificada) */
@@ -789,6 +790,7 @@ function leerConfigLibro(wb) {
   const gen = tablaConfig(hojaConfig(wb, 'General'), { p: ['parametro', 'dato'], v: ['valor'] });
   if (false && gen) for (const r of gen) if (norm(r.p).includes('modulacioncuenta') || norm(r.p).includes('modomodulacion')) cfg.modoMod = /rechazo/i.test(txt(r.v)) ? 'rechazo' : 'todas';   /* por defecto, sobre los rechazos */
   if (gen) for (const r of gen) if (norm(r.p).includes('viajes')) cfg.modoViajes = /taco|contar|countif/i.test(txt(r.v)) ? 'taco' : /segm/i.test(txt(r.v)) ? 'segmento' : /canal/i.test(txt(r.v)) ? 'canal' : 'dia';
+  if (gen) for (const r of gen) if (norm(r.p).includes('filtro') || norm(r.p).includes('rechazoinicial') || norm(r.p).includes('abrircon')) { const v = norm(r.v); if (v) cfg.filtroInicial = v.includes('nooficial') || v === 'no' ? 'no oficial' : 'oficial'; }
   if (gen) for (const r of gen) if (norm(r.p).includes('detractor')) { const v = num(r.v); if (v > 0) cfg.rmdDetractor = v; }
   if (gen) for (const r of gen) if (norm(r.p).includes('nexus')) { const f = fechaTexto(r.v); if (f) cfg.fecha_corte_nexus = f; else avisos.push('General: fecha de Nexus no válida'); }
   const can = tablaConfig(hojaConfig(wb, 'Canales'), { s: ['segmento', 'dsegvta1'], c: ['canal'] });
@@ -1843,6 +1845,7 @@ const planGrupo = new Map();
     modsLista: modRegs.slice(0, 200000).map(r => [fechaTexto(r.fecha), String(r._raw_fecha == null ? (r.fecha == null ? '' : r.fecha) : r._raw_fecha), cliN(r.cliente), String(r.status == null ? '' : r.status), String(r.motivo == null ? '' : r.motivo)]),
     detalle: rch.map(x => [x.f, x.planilla, x.cliente, mapOL(x.ol).ol === AGUANOR ? OL_OCULTO : mapOL(x.ol).ol, x.canal, x.S, x.V, x.X, x.pedRch, x.mod || '-', x.modTot, x.modEnt, x.modEntORch, x.hlRch, x.motRch, mapOL(x.ol).ol === AGUANOR ? '' : x.dni, x.conRch, x.chofer || '']),
     modoMod: CONFIG.modoMod,
+    ajustes: { claveFiltro: CONFIG.claveFiltro, filtroInicial: CONFIG.filtroInicial },
     modoViajes: CONFIG.modoViajes, olOculto: OL_OCULTO, olNoListar: [OL_OCULTO, SINPLAN, 'Sin OL'],
     filas, choferes, ols, kpis, campos: CAMPOS_NUCLEO.concat(camposExtra), config: raw.config,
     lectura: { fecha: new Date().toISOString(), archivos },
@@ -2456,7 +2459,7 @@ function eventos() {
   $('selAg').onchange = e => { S.sinAg = e.target.value === 'sin'; render(); };
   /* Filtro oficial / no oficial: oculto, se muestra solo con contraseña */
   $('btnMasFil').onclick = () => { const f = $('fAg');
-    if (f.hidden) { const clave = String((typeof CONFIG !== 'undefined' && CONFIG.claveFiltro) || 'ROLITRANCO').trim(); let ok = false; try { ok = sessionStorage.getItem('dimcFAg') === clave; } catch (e) {}
+    if (f.hidden) { const clave = String((DATA && DATA.ajustes && DATA.ajustes.claveFiltro) || (typeof CONFIG !== 'undefined' && CONFIG.claveFiltro) || 'ROLITRANCO').trim(); let ok = false; try { ok = sessionStorage.getItem('dimcFAg') === clave; } catch (e) {}
       if (!ok) { const c = window.prompt('Contraseña para ver el filtro de rechazo:'); if (c == null) return; if (String(c).trim().toUpperCase() !== clave.toUpperCase()) { window.alert('Contraseña incorrecta'); return; } try { sessionStorage.setItem('dimcFAg', clave); } catch (e) {} } }
     f.hidden = !f.hidden; $('btnMasFil').setAttribute('aria-expanded', String(!f.hidden)); };
   $('inChofer').onchange = e => { S.chofer = e.target.value; render(); };
@@ -2510,6 +2513,7 @@ function iniciarVistas(datos) {
   FECHAS = [...new Set(DATA.filas.map(r => r.f))].sort();
   MESES_DISP = [...new Set(FECHAS.map(f => f.slice(0, 7)))];
   S.pick = ''; S.ol = ''; S.canal = ''; S.chofer = '';
+  { const fi = (DATA.ajustes && DATA.ajustes.filtroInicial) || 'no oficial'; S.sinAg = !/no\s*oficial/i.test(fi); }
   S.desde = FECHAS[0] || ''; S.hasta = FECHAS[FECHAS.length - 1] || '';
   $('selOL').innerHTML = '<option value="">Todos</option>' + DATA.ols.map(o => `<option>${esc(o)}</option>`).join('');
   $('dlChofer').innerHTML = Object.values(DATA.choferes).map(c => `<option value="${esc(c.nombre)} · ${esc(c.dni)}">`).join('');
@@ -2524,7 +2528,7 @@ function iniciarVistas(datos) {
    - Si el navegador no permite recordar carpetas, usa el selector clásico.
    ===================================================================== */
 (function () {
-  const VERSION_TABLERO = '2026-10-15 09:50';
+  const VERSION_TABLERO = '2026-10-15 10:20';
   const g = id => document.getElementById(id);
   function mensaje(t, error) { const m = g('msg'); m.textContent = t; m.className = error ? 'err' : ''; }
   const hora = d => d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
