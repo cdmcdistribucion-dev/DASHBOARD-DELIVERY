@@ -206,7 +206,7 @@ html{scroll-behavior:smooth}
 <header class="topbar">
   <div class="brand">
     <h1>DASHBOARD DISTRI</h1>
-    <small>KPIs de choferes y operadores logísticos · versión 2026-10-15 10:20</small>
+    <small>KPIs de choferes y operadores logísticos · versión 2026-10-21 13:30</small>
   </div>
   <div class="fresh">
     <span id="freshText"><span class="dot off"></span>Sin datos cargados</span>
@@ -294,6 +294,7 @@ html{scroll-behavior:smooth}
 
   <section class="view" id="v-ol" hidden>
     <div class="tablewrap"><table id="tblOL"></table></div>
+    <div id="olAg" style="margin-top:22px"></div>
   </section>
 
   <section class="view" id="v-motivos" hidden>
@@ -421,7 +422,7 @@ let CONFIG = JSON.parse(JSON.stringify(CONFIG_DEF));
 
 /* KPIs fijos (se calculan con la lógica de RCH, modulaciones y RMD) */
 const KPIS_NUCLEO = {
-  rchHL: { dec: 2, num: 'hlRch', den: 'hlPed', fmt: 'pct', mejor: 'bajo', tol: 0.25, lbl: 'HL', sinAg: { num: 'hlRchSA', den: 'hlPed' } },   /* oficial: rechazos sin Aguanor ÷ HL pedidos totales (como el dashboard) */
+  rchHL: { dec: 2, num: 'hlRch', den: 'hlVta', fmt: 'pct', mejor: 'bajo', tol: 0.25, lbl: 'HL vta', sinAg: { num: 'hlRchSA', den: 'hlVta' } },   /* #HL Rch ÷ #HL Vta Bruta; oficial: rechazos sin Aguanor ÷ HL venta bruta total */
   rchPed: { dec: 2, num: 'pedRch', den: 'ped', fmt: 'pct', mejor: 'bajo', tol: 0.25, lbl: 'pedidos', sinAg: { num: 'pedRchSA', den: 'ped' } },
   adh: { num: 'modTot', den: 'modEntORch', fmt: 'pct', mejor: 'alto', tol: 0.05, lbl: 'clientes', sinAg: { num: 'modTotSA', den: 'modEntORchSA', soloOL: true } },
   efe: { num: 'modEnt', den: 'modTot', fmt: 'pct', mejor: 'alto', tol: 0.05, lbl: 'clientes', sinAg: { num: 'modEntSA', den: 'modTotSA', soloOL: true } },
@@ -433,11 +434,11 @@ const KPIS_NUCLEO = {
   obMino: { num: 'palMinoP', den: 'viaMino', fmt: 'dec', mejor: 'alto', tol: 0.05, lbl: 'viajes Mino', soloResumen: true, requiere: 'pal', general: { num: 'palP', den: 'viajes' } },
   obSMK: { num: 'palSMKP', den: 'viaSMK', fmt: 'dec', mejor: 'alto', tol: 0.05, lbl: 'viajes SMK', soloResumen: true, requiere: 'pal', general: { num: 'palP', den: 'viajes' } }
 };
-const CAMPOS_NUCLEO = ['rmdDet', 'aoSum', 'aoN', 'modTotSA', 'modEntSA', 'modEntORchSA', 'viajesT', 'palP', 'palMinoP', 'palSMKP', 'viajesD', 'viajesC', 'viajesS', 'hlPedSA', 'hlRchSA', 'pedSA', 'pedRchSA', 'pal', 'palMino', 'palSMK', 'viaMino', 'viaSMK', 'viajes', 'ped', 'pedRch', 'hlPed', 'hlRch', 'modTot', 'modEnt', 'modEntORch', 'rmdSum', 'rmdN'];
+const CAMPOS_NUCLEO = ['hlVta', 'rmdDet', 'aoSum', 'aoN', 'modTotSA', 'modEntSA', 'modEntORchSA', 'viajesT', 'palP', 'palMinoP', 'palSMKP', 'viajesD', 'viajesC', 'viajesS', 'hlPedSA', 'hlRchSA', 'pedSA', 'pedRchSA', 'pal', 'palMino', 'palSMK', 'viaMino', 'viaSMK', 'viajes', 'ped', 'pedRch', 'hlPed', 'hlRch', 'modTot', 'modEnt', 'modEntORch', 'rmdSum', 'rmdN'];
 /* Datos de RCH/RMD que se pueden usar como numerador o denominador de un KPI nuevo */
 const REF_NUCLEO = {
   viajes: ['viajes', 'viajes'], pedidos: ['ped', 'pedidos'], pedidosrechazados: ['pedRch', 'pedidos rechazados'],
-  hlpedidos: ['hlPed', 'HL'], hlrechazados: ['hlRch', 'HL rechazados'],
+  hlpedidos: ['hlPed', 'HL'], hlrechazados: ['hlRch', 'HL rechazados'], hlventabruta: ['hlVta', 'HL venta bruta'], hlvtabruta: ['hlVta', 'HL venta bruta'],
   calificacionesrmd: ['rmdN', 'calificaciones'], calificaciones: ['rmdN', 'calificaciones']
 };
 
@@ -1228,6 +1229,7 @@ function procesar(raw) {
   for (const r of raw.SALIDA) rango(D.rSal, fechaTexto(r.fecha));
   /* OL desde otras bases (BEES): por planilla, o por fecha + cliente, para planillas que no están en SALIDA */
   const olPlanB = new Map(), olFCB = new Map(); D.olColBases = [];
+  const olPlanBF = new Map(), beesFechas = new Set();   /* rechazo oficial: planilla → fecha → OL de BEES */
   for (const b of CONFIG.bases) {
     const regs = raw.EXTRA[b.id]; if (!regs || !regs.length) continue;
     const enc = raw.EXTRA_ENC[b.id] || [];
@@ -1238,9 +1240,19 @@ function procesar(raw) {
     for (const r of regs) {
       const o = String(r[cO] == null ? '' : r[cO]).trim(); if (!o) continue;
       if (cP) { const p = llaveP(r[cP]); if (p && !olPlanB.has(p)) olPlanB.set(p, o); }
+      if (cP) { const p = llaveP(r[cP]), fb = cF ? fechaTexto(r[cF]) : ''; if (p) { let m = olPlanBF.get(p); if (!m) olPlanBF.set(p, m = new Map()); if (!m.has(fb)) m.set(fb, o); if (fb) beesFechas.add(fb); } }
       if (cC && cF) { const k = r[cF] + '|' + cliN(r[cC]); if (!olFCB.has(k)) olFCB.set(k, o); }
     }
   }
+  /* OL de la planilla en BEES para el rechazo oficial: la fecha más cercana dentro de ±3 días (las planillas se repiten en el año) */
+  const masDias = (f, d) => { const t = new Date(f + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + d); return t.toISOString().slice(0, 10); };
+  function olBeesPlan(p, f) {
+    const m = p && olPlanBF.get(p); if (!m) return '';
+    if (m.has(f)) return m.get(f);
+    for (let d = 1; d <= 3; d++) { const a = masDias(f, -d), b = masDias(f, d); if (m.has(a)) return m.get(a); if (m.has(b)) return m.get(b); }
+    return m.size === 1 && m.has('') ? m.get('') : '';
+  }
+  const hayBees = f => { if (!beesFechas.size) return false; for (let d = -3; d <= 3; d++) if (beesFechas.has(d ? masDias(f, d) : f)) return true; return false; };
   function olDeBases(p, f, c) { return (p && olPlanB.get(p)) || (f && c && olFCB.get(f + '|' + c)) || ''; }
   /* ¿La bajada de RCH trae el OL (como la columna G del taco)? Se usa si la mayoría coincide con los OL oficiales o EB */
   let usarOlRch = false;
@@ -1295,11 +1307,13 @@ function procesar(raw) {
     const olR = (olF || olS || olB) ? '' : String(r.olRch == null ? '' : r.olRch).trim();
     const olFin = olF || olS || olB || olR || 'Sin OL';
     /* No oficial: si la fila quedó en Aguanor, se busca el OL al que pertenecía: D.Fletero, SALIDA OL (fecha + planilla), BEES */
-    let olNO = '';
+    let olNO = '', olNOf = '';
     if (olFin === 'Sin OL' || mapOL(olFin).ol === AGUANOR) {
       const esOf = v => v && !/aguanor/i.test(v) && mapOL(v).ol !== AGUANOR && !olExcluido(v, f) ? v : '';
       const flD = String(r.flD == null ? '' : r.flD).trim();
-      olNO = esOf(flD) || esOf(s && s.ol) || esOf(olDeBases(p, f, cliN(r.cliente)));
+      const oB = esOf(olDeBases(p, f, cliN(r.cliente)));
+      olNO = esOf(flD) || esOf(s && s.ol) || oB;
+      olNOf = esOf(flD) ? 'D.Fletero' : esOf(s && s.ol) ? 'SALIDA OL' : oB ? 'BEES' : '';
       if (olNO) D.ctl.olNO = (D.ctl.olNO || 0) + 1;
     }
     if (olF) D.ctl.olFl++; else if (olS) D.ctl.olSal++; else if (olB) D.ctl.olBees++; else if (olR) D.ctl.olRch++; else D.ctl.olSin++;
@@ -1311,6 +1325,7 @@ function procesar(raw) {
     if (!s) { const ss = q.sinSalida.get(p) || { planilla: p, desde: f, hasta: f, filas: 0, hl: 0, seg: new Set() }; ss.filas++; ss.hl += num(r.hlPed); if (f < ss.desde) ss.desde = f; if (f > ss.hasta) ss.hasta = f; ss.seg.add(String(r.seg || '').trim()); q.sinSalida.set(p, ss); D.rchSinSalida++; const mes = f.slice(0, 7); D.sinSalMes[mes] = (D.sinSalMes[mes] || 0) + 1; rango(D.rRchSin, f); } else D.rchOk++;
     rango(D.rRch, f);
     const U = num(r.hlPed), W = num(r.hlRch);
+    const Zf = (r.hlVta !== undefined && r.hlVta !== '') ? num(r.hlVta) : Math.max(0, U - W);   /* #HL Vta Bruta (si la bajada no la trae: pedidos − rechazados) */
     if (r.hlVta !== undefined && r.hlVta !== '' && Math.abs(U - (W + num(r.hlVta))) > 0.01) q.hlInc++;
     /* Variantes de rechazo para comparar con el dashboard (por día, OL propio / EB / Aguanor, S+V=0, sin SALIDA) */
     { const olV = oculto ? OL_OCULTO : olFin;
@@ -1319,13 +1334,22 @@ function procesar(raw) {
       const cp = (r.cntPed !== undefined && r.cntPed !== '') ? num(r.cntPed) : (S > 0 ? 1 : 0);
       const b = D.rchVar[kv] || (D.rchVar[kv] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
       b[0] += U; b[1] += W; b[2] += cp; b[3] += S > 0 ? 1 : 0; b[4] += (S > 0 && X <= 0) ? 1 : 0; b[5] += V > 0 ? 1 : 0; b[6] += (S > 0 && X <= 0) ? cp : 0; b[7] += 1; b[8] += num(r.pal);
-      const Zv = num(r.hlVta); b[9] += Zv; b[10] += Math.max(0, U - Zv); b[11] += (S > 0 && X <= 0) ? W : 0; b[12] += (S > 0 && X <= 0) ? U : 0; }
+      const Zv = Zf; b[9] += Zv; b[10] += Math.max(0, U - Zv); b[11] += (S > 0 && X <= 0) ? W : 0; b[12] += (S > 0 && X <= 0) ? U : 0; }
+    /* Rechazo oficial: el OL sale de la planilla en BEES (a veces la bajada le pone el cliente rechazado a otro OL).
+       Si la planilla no está en BEES, queda en Aguanor (no cuenta ni se muestra). Si BEES no tiene datos de ese día, se usa el OL de la bajada. */
+    let olOfi = '', olOfiF = '';
+    { const ob = olBeesPlan(p, f);
+      if (ob) { olOfiF = 'BEES'; olOfi = olExcluido(ob, f) ? OL_OCULTO : mapOL(ob).ol === AGUANOR ? '' : ob; if (!olOfi) olOfiF = 'BEES (Aguanor u OL no oficial)'; }
+      else if (hayBees(f)) { olOfiF = 'No está en BEES'; olOfi = ''; }
+      else { olOfiF = 'Sin BEES ese día (OL de la bajada)'; olOfi = oculto ? OL_OCULTO : (olFin !== 'Sin OL' && mapOL(olFin).ol !== AGUANOR ? olFin : ''); }
+      const k = olOfiF; D.ofiFuente = D.ofiFuente || {}; const b = D.ofiFuente[k] || (D.ofiFuente[k] = [0, 0, 0]); b[0]++; b[1] += num(r.hlRch); b[2] += (S > 0 && X <= 0) ? 1 : 0;
+      if (olOfi && olOfi !== OL_OCULTO && !oculto && olFin !== 'Sin OL' && mapOL(olFin).ol !== AGUANOR && mapOL(olOfi).ol !== mapOL(olFin).ol && (num(r.hlRch) > 0 || (S > 0 && X <= 0))) D.ofiDistinto = (D.ofiDistinto || 0) + 1; }
     rch.push({
       f, planilla: p, cliente: cliN(r.cliente),
-      chofer: oculto ? '' : (s ? s.chofer : ''), dni: oculto ? '' : (s ? s.dni : ''), ol: oculto ? OL_OCULTO : olFin, olNO, canal: canalDe(r.seg),
+      chofer: oculto ? '' : (s ? s.chofer : ''), dni: oculto ? '' : (s ? s.dni : ''), ol: oculto ? OL_OCULTO : olFin, olNO, olNOf, olOfi, olOfiF, canal: canalDe(r.seg),
       ped: (r.cntPed !== undefined && r.cntPed !== '') ? num(r.cntPed) : (S > 0 ? 1 : 0),
       pedRch: (S > 0 && X <= 0) ? 1 : 0,
-      hlPed: U, hlRch: W, S, V, X, via: r._v || 0, viaT: r._vT || 0, viaC: r._vC || 0, viaS: r._vS || 0, cr: crudo(r.cliente), pr: crudo(r.planilla), mod: '', pal: num(r.pal), motRch: String(r.motRch == null ? '' : r.motRch).trim(), fA: (r._f2 || []).map(v => fechaTexto(v)), fAmb: otraLectura(r._raw_fecha, f), cMT: r.cModTot, cME: r.cModEnt, cMER: r.cModER, cMU: r.cModUni, cMS: r.cModSic
+      hlPed: U, hlRch: W, hlVta: Zf, S, V, X, via: r._v || 0, viaT: r._vT || 0, viaC: r._vC || 0, viaS: r._vS || 0, cr: crudo(r.cliente), pr: crudo(r.planilla), mod: '', pal: num(r.pal), motRch: String(r.motRch == null ? '' : r.motRch).trim(), fA: (r._f2 || []).map(v => fechaTexto(v)), fAmb: otraLectura(r._raw_fecha, f), cMT: r.cModTot, cME: r.cModEnt, cMER: r.cModER, cMU: r.cModUni, cMS: r.cModSic
     });
   }
 
@@ -1542,7 +1566,7 @@ function procesar(raw) {
 
   /* Filas agregadas por fecha + chofer + OL + canal */
   const grupos = new Map();
-  const base = (f, dni, ol, canal) => ({ f, dni, ol, canal, viajesD: 0, viajesT: 0, viajesC: 0, viajesS: 0, pal: 0, palMino: 0, palSMK: 0, palP: 0, palMinoP: 0, palSMKP: 0, viaMino: 0, viaSMK: 0, viajes: 0, ped: 0, pedRch: 0, hlPed: 0, hlRch: 0, hlPedSA: 0, hlRchSA: 0, pedSA: 0, pedRchSA: 0, modTot: 0, modEnt: 0, modEntORch: 0, modTotSA: 0, modEntSA: 0, modEntORchSA: 0, aoSum: 0, aoN: 0, rmdDet: 0, rmdSum: 0, rmdN: 0 });
+  const base = (f, dni, ol, canal) => ({ f, dni, ol, canal, viajesD: 0, viajesT: 0, viajesC: 0, viajesS: 0, pal: 0, palMino: 0, palSMK: 0, palP: 0, palMinoP: 0, palSMKP: 0, viaMino: 0, viaSMK: 0, viajes: 0, ped: 0, pedRch: 0, hlPed: 0, hlRch: 0, hlVta: 0, hlPedSA: 0, hlRchSA: 0, pedSA: 0, pedRchSA: 0, modTot: 0, modEnt: 0, modEntORch: 0, modTotSA: 0, modEntSA: 0, modEntORchSA: 0, aoSum: 0, aoN: 0, rmdDet: 0, rmdSum: 0, rmdN: 0 });
   /* Viajes como el taco: cada fila de una planilla vale 1 / (filas de esa planilla).
      Así una planilla que reparte en Mino y SMK suma 1 viaje en total, repartido entre los canales. */
   const grupOL = new Map();
@@ -1570,10 +1594,21 @@ const planGrupo = new Map();
       g = grupos.get(kh); if (!g) { g = base(x.f, '', OL_OCULTO, x.canal); g.olOrig = 'Aguanor'; grupos.set(kh, g); }
     } else {
       g = grupos.get(k); if (!g) { g = base(x.f, x.dni, o.ol, x.canal); g.olOrig = o.orig; grupos.set(k, g); }
-      g.hlPedSA += x.hlPed; g.hlRchSA += x.hlRch; g.pedSA += x.ped; g.pedRchSA += x.pedRch;
+      g.hlPedSA += x.hlPed; g.pedSA += x.ped;
       g.modTotSA += x.modTot; g.modEntSA += x.modEnt; g.modEntORchSA += x.modEntORch;
     }
-    g.ped += x.ped; g.pedRch += x.pedRch; g.hlPed += x.hlPed; g.hlRch += x.hlRch;
+    /* Rechazo oficial (numerador): al OL de la planilla en BEES. Si coincide con el grupo de la fila, queda con su chofer;
+       si es otro OL, va a ese OL sin chofer. Sin OL oficial (no está en BEES / Aguanor): no suma al oficial. */
+    if (x.olOfi && (x.hlRch || x.pedRch)) {
+      const oo = x.olOfi === OL_OCULTO ? { ol: OL_OCULTO, orig: OL_OCULTO } : mapOL(x.olOfi);
+      let gs = g;
+      if (esAg || g.reasig || oo.ol !== g.ol) {
+        const kb = 'B|' + x.f + '|' + oo.ol + '|' + x.canal;
+        gs = grupos.get(kb); if (!gs) { gs = base(x.f, '', oo.ol, x.canal); gs.olOrig = oo.orig; gs.reasigOf = 1; grupos.set(kb, gs); }
+      }
+      gs.hlRchSA += x.hlRch; gs.pedRchSA += x.pedRch;
+    }
+    g.ped += x.ped; g.pedRch += x.pedRch; g.hlPed += x.hlPed; g.hlRch += x.hlRch; g.hlVta += x.hlVta;
     g.modTot += x.modTot; g.modEnt += x.modEnt; g.modEntORch += x.modEntORch;
     const via = CONFIG.modoViajes === 'taco' ? x.viaT : CONFIG.modoViajes === 'canal' ? x.viaC : CONFIG.modoViajes === 'segmento' ? x.viaS : x.via;
     g.viajesD += x.via; g.viajesT += x.viaT; g.viajesC += x.viaC; g.viajesS += x.viaS;
@@ -1843,7 +1878,7 @@ const planGrupo = new Map();
 
   return {
     modsLista: modRegs.slice(0, 200000).map(r => [fechaTexto(r.fecha), String(r._raw_fecha == null ? (r.fecha == null ? '' : r.fecha) : r._raw_fecha), cliN(r.cliente), String(r.status == null ? '' : r.status), String(r.motivo == null ? '' : r.motivo)]),
-    detalle: rch.map(x => [x.f, x.planilla, x.cliente, mapOL(x.ol).ol === AGUANOR ? OL_OCULTO : mapOL(x.ol).ol, x.canal, x.S, x.V, x.X, x.pedRch, x.mod || '-', x.modTot, x.modEnt, x.modEntORch, x.hlRch, x.motRch, mapOL(x.ol).ol === AGUANOR ? '' : x.dni, x.conRch, x.chofer || '']),
+    detalle: rch.map(x => [x.f, x.planilla, x.cliente, mapOL(x.ol).ol === AGUANOR ? OL_OCULTO : mapOL(x.ol).ol, x.canal, x.S, x.V, x.X, x.pedRch, x.mod || '-', x.modTot, x.modEnt, x.modEntORch, x.hlRch, x.motRch, mapOL(x.ol).ol === AGUANOR ? '' : x.dni, x.conRch, x.chofer || '', x.olNO ? mapOL(x.olNO).ol : '', x.hlVta, x.olNOf || '', x.ped, mapOL(x.ol).ol === AGUANOR ? 1 : 0, x.olOfi ? (x.olOfi === OL_OCULTO ? OL_OCULTO : mapOL(x.olOfi).ol) : 'Aguanor', x.olOfiF]),
     modoMod: CONFIG.modoMod,
     ajustes: { claveFiltro: CONFIG.claveFiltro, filtroInicial: CONFIG.filtroInicial },
     modoViajes: CONFIG.modoViajes, olOculto: OL_OCULTO, olNoListar: [OL_OCULTO, SINPLAN, 'Sin OL'],
@@ -2141,11 +2176,43 @@ function renderOL() {
   const otros = fil.filter(x => x.ol === DATA.olOculto && !esAgF(x));
   const nota = [];
   const agTodo = fil.filter(x => esAgF(x) || x.reasig); const reas = fil.filter(x => x.reasig);
-  if (ofi && agTodo.length) { const sa = sumar(agTodo); nota.push(`Oficial: los rechazos pasados a Aguanor no cuentan (${nf1.format(sa.hlPed)} HL pedidos, ${nf1.format(sa.hlRch)} HL rechazados, ${nf0.format(sa.ped)} pedidos, ${nf0.format(sa.pedRch)} pedidos rechazados). En "No oficial" vuelven al OL al que pertenecían (por D.Fletero, SALIDA OL o BEES): ${nf0.format(sumar(reas).ped)} pedidos.`); }
+  if (ofi) { const T = sumar(fil); const aH = T.hlRch - T.hlRchSA, aP = T.pedRch - T.pedRchSA; nota.push(`Oficial: cada rechazo cuenta para el OL de su planilla en BEES. Las planillas que no están en BEES quedan en Aguanor y no cuentan (${nf1.format(aH)} HL rechazados, ${nf0.format(aP)} pedidos rechazados). El denominador es el total (HL venta bruta y pedidos de todos los OL).`); }
   if (!ofi && reas.length) { const sr = sumar(reas); nota.push(`No oficial: cada OL incluye los rechazos que se habían pasado a Aguanor y eran suyos (${nf1.format(sr.hlPed)} HL pedidos, ${nf0.format(sr.ped)} pedidos, ${nf0.format(sr.pedRch)} pedidos rechazados en total).`); }
   if (otros.length) { const se = sumar(otros); nota.push(`El total incluye OL dados de baja (EB) que no se muestran: ${nf1.format(se.hlPed)} HL pedidos, ${nf0.format(se.ped)} pedidos.`); }
   if (nota.length) document.getElementById('tblOL').insertAdjacentHTML('beforeend', `<tfoot><tr><td></td><td class="l" colspan="99" style="color:var(--muted);font-size:12px;white-space:normal">${nota.join('<br>')}</td></tr></tfoot>`);
   document.querySelectorAll('#tblOL tr[data-ol]').forEach(tr => tr.onclick = () => { S.ol = tr.dataset.ol; syncFiltros(); S.vista = 'choferes'; render(); });
+
+  renderOLAguanor(fil, rows, agR);
+}
+/* Rechazo oficial por OL de la planilla en BEES vs. el OL que figura en la bajada */
+function renderOLAguanor(fil, rows, agR) {
+  const box = document.getElementById('olAg'); if (!box) return;
+  const p2 = (a, b) => b ? (100 * a / b).toFixed(2).replace('.', ',') + '%' : '—';
+  const sg = v => (v > 0 ? '+' : '') + nf1.format(v), sg0 = v => (v > 0 ? '+' : '') + nf0.format(v);
+  const lst = rows.map(x => { const s = x.s; return { ol: x.ol, v: s.hlVta, ped: s.ped, hb: s.hlRch, hf: s.hlRchSA, pb: s.pedRch, pf: s.pedRchSA }; });
+  const T = sumar(fil);
+  const tot = lst.reduce((a, x) => { for (const k of ['v', 'ped', 'hb', 'hf', 'pb', 'pf']) a[k] += x[k]; return a; }, { v: 0, ped: 0, hb: 0, hf: 0, pb: 0, pf: 0 });
+  /* Lo que en el oficial no le queda a ningún OL visible: planillas que no están en BEES (Aguanor) */
+  const agH = T.hlRch - T.hlRchSA, agP = T.pedRch - T.pedRchSA;
+  const fila = (x, cls) => `<tr${cls ? ` class="${cls}"` : ''}><td class="l"><b>${esc(x.ol)}</b></td><td class="num">${nf1.format(x.v)}</td><td class="num">${nf1.format(x.hb)}</td><td class="num">${nf1.format(x.hf)}</td><td class="num">${sg(x.hf - x.hb)}</td><td class="num">${p2(x.hb, x.v)}</td><td class="num"><b>${p2(x.hf, x.v)}</b></td><td class="num">${nf0.format(x.pb)}</td><td class="num">${nf0.format(x.pf)}</td><td class="num">${sg0(x.pf - x.pb)}</td><td class="num">${p2(x.pb, x.ped)}</td><td class="num"><b>${p2(x.pf, x.ped)}</b></td></tr>`;
+  const filaAg = agH || agP ? `<tr class="sub"><td class="l" style="white-space:normal">Aguanor (planilla que no está en BEES): no cuenta en el oficial</td><td class="num">—</td><td class="num">—</td><td class="num">${nf1.format(agH)}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">${nf0.format(agP)}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>` : '';
+  const ff = (DATA.diagnostico && DATA.diagnostico.ofiFuente) || {};
+  const fuentes = Object.entries(ff).sort((a, b) => b[1][0] - a[1][0]).map(([k, b]) => `${esc(k)}: ${nf0.format(b[0])} filas (${nf1.format(b[1])} HL rch, ${nf0.format(b[2])} ped. rch)`).join(' · ');
+  box.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+    <div><h3 style="margin:0 0 4px;font-size:15px">Rechazo oficial: OL de la planilla en BEES</h3>
+    <p class="sub" style="margin:0;max-width:820px;white-space:normal">En el rechazo oficial, cada rechazo se le asigna al OL de su planilla en BEES (aunque en la bajada figure con otro OL). Si la planilla no está en BEES, queda en Aguanor y no se muestra. La diferencia muestra cuánto rechazo cambió de OL. Todo el período y canal elegidos, sin importar el filtro Oficial / No oficial.</p></div>
+    <button class="btn" id="btnAgDet">Descargar rechazos que cambian de OL (.xlsx)</button></div>
+  <div class="tablewrap"><table><thead><tr><th class="l">OL</th><th>HL vta bruta</th><th>HL rch según<br>la bajada</th><th>HL rch según<br>BEES (oficial)</th><th>Diferencia</th><th>RCH HL<br>bajada</th><th>RCH HL<br>oficial</th><th>Ped. rch<br>bajada</th><th>Ped. rch<br>BEES (oficial)</th><th>Diferencia</th><th>RCH PED<br>bajada</th><th>RCH PED<br>oficial</th></tr></thead>
+  <tbody>${lst.map(x => fila(x)).join('')}${filaAg}${fila(Object.assign({}, tot, { ol: 'Total', v: T.hlVta, ped: T.ped, hb: T.hlRch, hf: T.hlRchSA, pb: T.pedRch, pf: T.pedRchSA }), 'total')}</tbody></table></div>
+  <p class="sub" style="margin:6px 0 0;white-space:normal">"Según la bajada" = OL por D.Soc.Fletero, SALIDA o BEES, con lo pasado a Aguanor devuelto a su OL (como el no oficial). El total incluye EB y Aguanor. De dónde salió el OL oficial (todas las fechas): ${fuentes || '—'}.</p>`;
+  document.getElementById('btnAgDet').onclick = () => {
+    const r = rangoActual();
+    const olBaj = x => x[3] === DATA.olOculto ? (x[18] || 'Aguanor') : x[3];
+    const det = (DATA.detalle || []).filter(x => x[0] >= r.desde && x[0] <= r.hasta && (!S.canal || x[4] === S.canal) && (x[13] > 0 || x[8] > 0) && x[23] !== undefined && x[23] !== olBaj(x) && (!S.ol || x[23] === S.ol || olBaj(x) === S.ol));
+    const tipo = x => x[16] === 1 ? 'Total' : x[16] === 2 ? 'Parcial' : '';
+    descargarCSV('rechazos_que_cambian_de_OL_' + r.desde + '_al_' + r.hasta + '.csv', [['Fecha', 'Planilla', 'Cliente', 'OL según la bajada', 'OL oficial (BEES)', 'De dónde salió', 'Canal', 'Tipo de rechazo', 'HL vta bruta', 'HL rechazados', 'Pedido rechazado', 'Motivo']]
+      .concat(det.map(x => [fLarga(x[0]), x[1], x[2], olBaj(x), x[23] === DATA.olOculto ? 'EB (no se muestra)' : x[23], x[24] || '', x[4], tipo(x), x[19], x[13], x[8], x[14]])));
+  };
 }
 function renderMatriz() {
   let r = rangoActual(); if ((S.per === 'dia' || S.per === 'semana') && r.desde) { const ym = r.desde.slice(0, 7); r = { desde: ym + '-01', hasta: finMes(ym) }; }
@@ -2238,7 +2305,7 @@ function renderDiagnostico() {
       <p class="sub" style="margin:6px 0;white-space:normal">OL asignado a las filas: desde D.Soc.Fletero ${n0(C.olFl || 0)} · desde SALIDA OL (fecha + planilla) ${n0(C.olSal)} · desde BEES ${n0(C.olBees)} · desde la columna OL de la bajada ${n0(C.olRch)} · sin OL ${n0(C.olSin)}.<br>Filas por mes según cómo se leyó la fecha:<br>${lm}</p>${tablaFl}</details>`; })() +
     (() => { const r = rangoActual(); const V = D.rchVar || {}; const ent = Object.entries(V).map(([k, b]) => { const [f, cat, sv0, sinS] = k.split('|'); return { f, cat, sv0: sv0 === '1', sinS: sinS === '1', b }; }).filter(e => e.f >= r.desde && e.f <= r.hasta);
       if (!ent.length) return '';
-      const calc = (filtro, ip, ir) => { let h = 0, hr = 0, p = 0, pr = 0; for (const e of ent) if (filtro(e)) { h += e.b[0]; hr += e.b[1]; p += e.b[ip]; pr += e.b[ir]; } return { h, hr, p, pr }; };
+      const calc = (filtro, ip, ir) => { let h = 0, hr = 0, p = 0, pr = 0; for (const e of ent) if (filtro(e)) { h += e.b[9]; hr += e.b[1]; p += e.b[ip]; pr += e.b[ir]; } return { h, hr, p, pr }; };
       const pc = (a, b) => b ? (100 * a / b).toFixed(2).replace('.', ',') + '%' : '—';
       const vars = [
         ['<b>Como calcula el tablero hoy</b> (todas las filas · pedidos = Cnt Ped · rechazado = rechazo total)', e => true, 2, 4],
@@ -2253,21 +2320,22 @@ function renderDiagnostico() {
       const filas = vars.map(([t, fl, ip, ir]) => { const a = calc(fl, ip, ir), b0 = calc(e => fl(e) && e.cat !== 'ag' && e.cat !== 'so', ip, ir), b = { h: a.h, hr: b0.hr, p: a.p, pr: b0.pr };   /* oficial: rechazos sin Aguanor ÷ total con Aguanor */
         return `<tr><td class="l" style="white-space:normal">${t}</td><td class="num">${pc(a.hr, a.h)}</td><td class="num">${pc(b.hr, b.h)}</td><td class="num">${pc(a.pr, a.p)}</td><td class="num">${pc(b.pr, b.p)}</td><td class="num" style="color:var(--muted)">${nf0.format(Math.round(a.pr))} / ${nf0.format(Math.round(a.p))}</td></tr>`; }).join('');
       const T0 = calc(e => true, 2, 4), TA = calc(e => e.cat === 'ag' || e.cat === 'so', 2, 4); const n1 = v => nf1.format(v), pc2 = (x, y) => y ? (100 * x / y).toFixed(2).replace('.', ',') + '%' : '—';
-      const resumenDash = `<div class="tablewrap" style="max-height:none;margin-top:6px;max-width:620px"><table><thead><tr><th class="l">Como tu dashboard (período elegido)</th><th>Valor</th></tr></thead><tbody>${[['HL RCH con Aguanor', n1(T0.hr)], ['HL RCH sin Aguanor', n1(T0.hr - TA.hr)], ['HL PED (con Aguanor)', n1(T0.h)], ['# PED (Cnt. Lleg. PDV c/P)', nf0.format(T0.p)], ['PED RCH con Aguanor', nf0.format(T0.pr)], ['PED RCH sin Aguanor', nf0.format(T0.pr - TA.pr)], ['% RCH HL con Aguanor', pc2(T0.hr, T0.h)], ['% RCH HL sin Aguanor', pc2(T0.hr - TA.hr, T0.h)], ['% RCH PED con Aguanor', pc2(T0.pr, T0.p)], ['% RCH PED sin Aguanor', pc2(T0.pr - TA.pr, T0.p)]].map(([x, v]) => `<tr><td class="l">${x}</td><td class="num">${v}</td></tr>`).join('')}</tbody></table></div>`;
+      const resumenDash = `<div class="tablewrap" style="max-height:none;margin-top:6px;max-width:620px"><table><thead><tr><th class="l">Como tu dashboard (período elegido)</th><th>Valor</th></tr></thead><tbody>${[['HL RCH con Aguanor', n1(T0.hr)], ['HL RCH sin Aguanor', n1(T0.hr - TA.hr)], ['HL VTA BRUTA (con Aguanor)', n1(T0.h)], ['# PED (Cnt. Lleg. PDV c/P)', nf0.format(T0.p)], ['PED RCH con Aguanor', nf0.format(T0.pr)], ['PED RCH sin Aguanor', nf0.format(T0.pr - TA.pr)], ['% RCH HL con Aguanor', pc2(T0.hr, T0.h)], ['% RCH HL sin Aguanor', pc2(T0.hr - TA.hr, T0.h)], ['% RCH PED con Aguanor', pc2(T0.pr, T0.p)], ['% RCH PED sin Aguanor', pc2(T0.pr - TA.pr, T0.p)]].map(([x, v]) => `<tr><td class="l">${x}</td><td class="num">${v}</td></tr>`).join('')}</tbody></table></div>`;
       const t0 = calc(e => true, 2, 4), ag = calc(e => e.cat === 'ag' || e.cat === 'so', 2, 4), eb = calc(e => e.cat === 'eb', 2, 4), s0 = calc(e => e.sv0, 2, 4);
       const nfil = ent.reduce((a, e) => a + e.b[7], 0);
       /* Variantes del rechazo en HL (numerador y denominador), con y sin Aguanor; oficial = rechazos sin Aguanor ÷ total */
       const sumI = (fl, i) => ent.reduce((a, e) => a + (fl(e) ? (e.b[i] || 0) : 0), 0), todo = e => true, sinA = e => e.cat !== 'ag' && e.cat !== 'so';
-      const hU = sumI(todo, 0), hZW = sumI(todo, 9) + sumI(todo, 1);
+      const hU = sumI(todo, 0), hZ = sumI(todo, 9), hZW = sumI(todo, 9) + sumI(todo, 1);
       const hv = [
-        ['<b>#HL Rch ÷ #HL Ped R SUM</b> (usa el tablero)', 1, hU],
+        ['<b>#HL Rch ÷ #HL Vta Bruta</b> (usa el tablero)', 1, hZ],
+        ['#HL Rch ÷ #HL Ped R SUM (cálculo anterior)', 1, hU],
         ['(#HL Ped − #HL Vta Bruta) ÷ #HL Ped R SUM', 10, hU],
         ['#HL Rch ÷ (#HL Vta Bruta + #HL Rch)', 1, hZW],
         ['#HL Rch solo de rechazos totales ÷ #HL Ped R SUM', 11, hU]
       ];
       const tablaHL = `<div class="tablewrap" style="max-height:none;margin-top:6px"><table><thead><tr><th class="l">Rechazo en HL · criterio</th><th>HL rech. no oficial</th><th>HL rech. oficial</th><th>HL denominador</th><th>RCH HL no oficial</th><th>RCH HL oficial</th></tr></thead><tbody>${hv.map(([t, i, d]) => { const n = sumI(todo, i), no = sumI(sinA, i); return `<tr><td class="l" style="white-space:normal">${t}</td><td class="num">${nf1.format(n)}</td><td class="num">${nf1.format(no)}</td><td class="num">${nf1.format(d)}</td><td class="num">${pc(n, d)}</td><td class="num">${pc(no, d)}</td></tr>`; }).join('')}</tbody></table></div><p class="sub" style="margin:6px 0">Elegí un día y compará con tu dashboard: HL rechazados con y sin Aguanor, HL pedidos y los dos %.</p>`;
       return `<details open><summary style="cursor:pointer;font-size:13px;color:var(--accent)">Rechazo del período según criterio (para comparar con el dashboard)</summary>${resumenDash}<div class="tablewrap" style="max-height:none;margin-top:6px"><table><thead><tr><th class="l">Criterio</th><th>RCH HL<br>no oficial</th><th>RCH HL<br>oficial</th><th>RCH PED<br>no oficial</th><th>RCH PED<br>oficial</th><th>Ped. rech. / pedidos</th></tr></thead><tbody>${filas}</tbody></table></div>
-      <p class="sub" style="margin:6px 0;white-space:normal">Filas del período: ${nf0.format(nfil)} · HL pedidos ${nf0.format(Math.round(t0.h))} (Aguanor ${nf0.format(Math.round(ag.h))}, EB ${nf0.format(Math.round(eb.h))}) · HL rechazados ${nf0.format(Math.round(t0.hr))} (Aguanor ${nf0.format(Math.round(ag.hr))}, EB ${nf0.format(Math.round(eb.hr))}) · Cnt Ped ${nf0.format(Math.round(t0.p))}, de ellos ${nf0.format(Math.round(s0.p))} en filas con Cj Ped + Cj Rch = 0. Los viajes no intervienen en el rechazo.</p>${tablaHL}</details>`; })() +
+      <p class="sub" style="margin:6px 0;white-space:normal">Filas del período: ${nf0.format(nfil)} · HL vta bruta ${nf0.format(Math.round(t0.h))} (Aguanor ${nf0.format(Math.round(ag.h))}, EB ${nf0.format(Math.round(eb.h))}) · HL rechazados ${nf0.format(Math.round(t0.hr))} (Aguanor ${nf0.format(Math.round(ag.hr))}, EB ${nf0.format(Math.round(eb.hr))}) · Cnt Ped ${nf0.format(Math.round(t0.p))}, de ellos ${nf0.format(Math.round(s0.p))} en filas con Cj Ped + Cj Rch = 0. Los viajes no intervienen en el rechazo.</p>${tablaHL}</details>`; })() +
     (() => { const r = rangoActual(); const sx = sumar(DATA.filas.filter(x => x.f >= r.desde && x.f <= r.hasta)); if (!sx.pal && !sx.palP) return '';
       const d2 = v => isFinite(v) ? v.toFixed(2).replace('.', ',') : '—', n0 = v => nf0.format(Math.round(v));
       const fila = (t, pT, pP, v, neg) => `<tr${neg ? ' style="font-weight:700"' : ''}><td class="l">${t}</td><td class="num">${n0(pT)}</td><td class="num">${n0(pP)}</td><td class="num">${n0(v)}</td><td class="num">${d2(pT / v)}</td><td class="num">${d2(pP / v)}</td></tr>`;
@@ -2528,7 +2596,7 @@ function iniciarVistas(datos) {
    - Si el navegador no permite recordar carpetas, usa el selector clásico.
    ===================================================================== */
 (function () {
-  const VERSION_TABLERO = '2026-10-15 10:20';
+  const VERSION_TABLERO = '2026-10-21 13:30';
   const g = id => document.getElementById(id);
   function mensaje(t, error) { const m = g('msg'); m.textContent = t; m.className = error ? 'err' : ''; }
   const hora = d => d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
