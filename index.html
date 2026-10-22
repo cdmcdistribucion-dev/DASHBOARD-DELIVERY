@@ -206,7 +206,7 @@ html{scroll-behavior:smooth}
 <header class="topbar">
   <div class="brand">
     <h1>DASHBOARD DISTRI</h1>
-    <small>KPIs de choferes y operadores logísticos · versión 2026-10-22 13:10</small>
+    <small>KPIs de choferes y operadores logísticos · versión 2026-10-22 15:15</small>
   </div>
   <div class="fresh">
     <span id="freshText"><span class="dot off"></span>Sin datos cargados</span>
@@ -2672,9 +2672,11 @@ function eventos() {
   $('btnExpCh').onclick = () => { const rows = filasChoferes().filter(x => x.viajes >= S.min); descargarCSV('ranking_choferes.csv', [['DNI', 'Chofer', 'Operador', 'Viajes', ...ACT_TABLA.map(k => k.nombre)], ...rows.map(x => [x.dni, x.nombre, x.ol, x.viajes, ...ACT_TABLA.map(k => n4(x[k.id]))])]); };
   $('btnExpDia').onclick = () => {
     const r = rangoActual(); const g = agrupar(filtrar(r, true).filter(x => x.dni), x => x.f + '|' + x.dni);
-    const head = ['Fecha', 'DNI', 'Chofer', 'Operador']; ACT_TABLA.forEach(k => head.push(k.nombre, k.nombre + ' numerador', k.nombre + ' denominador'));
-    const out = [head]; [...g.entries()].sort().forEach(([key, rows]) => { const [f, dni] = key.split('|'); const sx = sumar(rows); const fila = [fLarga(f), dni, nombreChofer(dni), (DATA.choferes[dni] || {}).ol || rows[0].ol]; ACT_TABLA.forEach(k => fila.push(n4(valor(k, sx)), n4(sx[k.num]), n4(sx[k.den]))); out.push(fila); });
-    descargarCSV(`kpis_diarios_${r.desde}_${r.hasta}.csv`, out);
+    /* Un valor por KPI y por día, igual que en pantalla y según el filtro Oficial / No oficial: los % van como número (4,37 = 4,37%) */
+    const head = ['Fecha', 'DNI', 'Chofer', 'Operador']; ACT_TABLA.forEach(k => head.push(k.nombre + (k.fmt === 'pct' ? ' (%)' : '')));
+    const num = (k, v) => { if (v == null) return ''; const d = k.dec != null ? k.dec : 2; const x = k.fmt === 'pct' ? v * 100 : v; return Math.round(x * 10 ** d) / 10 ** d; };
+    const out = [head]; [...g.entries()].sort().forEach(([key, rows]) => { const [f, dni] = key.split('|'); const sx = sumar(rows); const fila = [fLarga(f), dni, nombreChofer(dni), (DATA.choferes[dni] || {}).ol || rows[0].ol]; ACT_TABLA.forEach(k => fila.push(num(k, valor(k, sx)))); out.push(fila); });
+    descargarCSV(`kpis_diarios_${S.sinAg ? 'oficial' : 'no_oficial'}_${r.desde}_${r.hasta}.csv`, out);
   };
   let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (DATA) render(); }, 150); });
 }
@@ -2718,7 +2720,7 @@ function iniciarVistas(datos) {
    - Si el navegador no permite recordar carpetas, usa el selector clásico.
    ===================================================================== */
 (function () {
-  const VERSION_TABLERO = '2026-10-22 13:10';
+  const VERSION_TABLERO = '2026-10-22 15:15';
   const g = id => document.getElementById(id);
   function mensaje(t, error) { const m = g('msg'); m.textContent = t; m.className = error ? 'err' : ''; }
   const hora = d => d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
