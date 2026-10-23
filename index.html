@@ -206,7 +206,7 @@ html{scroll-behavior:smooth}
 <header class="topbar">
   <div class="brand">
     <h1>DASHBOARD DISTRI</h1>
-    <small>KPIs de choferes y operadores logísticos · versión 2026-10-22 15:15</small>
+    <small>KPIs de choferes y operadores logísticos · versión 2026-10-23 13:30</small>
   </div>
   <div class="fresh">
     <span id="freshText"><span class="dot off"></span>Sin datos cargados</span>
@@ -248,6 +248,7 @@ html{scroll-behavior:smooth}
   <button role="tab" data-v="choferes">Ranking de choferes <span class="count" id="cntCh"></span></button>
   <button role="tab" data-v="ol">Operadores logísticos</button>
   <button role="tab" data-v="motivos">Motivos</button>
+  <button role="tab" data-v="refac">Refacturaciones</button>
   <button role="tab" data-v="dias">Día a día</button>
   <button role="tab" data-v="calidad">Calidad de datos <span class="count" id="cntQ"></span></button>
 </nav>
@@ -311,6 +312,18 @@ html{scroll-behavior:smooth}
         <div class="tablewrap" style="max-height:none"><table id="tblMotMod"></table></div>
       </div>
     </div>
+  </section>
+
+  <section class="view" id="v-refac" hidden>
+    <div class="panel">
+      <h2>Refacturaciones</h2><p class="sub" id="refSub"></p>
+      <div id="refRes"></div>
+    </div>
+    <div class="grid2" style="grid-template-columns:1fr 1fr;margin-top:16px">
+      <div class="panel"><h2>Motivos de refacturación (Chat Tonic)</h2><div class="tablewrap" style="max-height:none"><table id="tblRefMot"></table></div></div>
+      <div class="panel"><h2>Por operador logístico</h2><div class="tablewrap" style="max-height:none"><table id="tblRefOL"></table></div></div>
+    </div>
+    <div class="panel" style="margin-top:16px"><h2>Choferes con refacturaciones</h2><div class="tablewrap" style="max-height:480px"><table id="tblRefCh"></table></div></div>
   </section>
 
   <section class="view" id="v-dias" hidden>
@@ -399,7 +412,8 @@ const CONFIG_DEF = {
   columnas: [],          /* encabezados extra para las bases fijas: {base, campo, encabezado} */
   bases: [
     { id: 'BEES', palabra: 'BEES', colFecha: 'Fecha', colPlanilla: '_ID_PLANILLA', colCliente: '_ID_CLIENTE', colDni: '', colOl: 'AH', activa: true },
-    { id: 'REFAC', palabra: 'REFAC', colFecha: 'Fecha', colPlanilla: 'Planilla', colCliente: 'Cod Cliente', colDni: '', activa: true },
+    { id: '3308', palabra: '3308|3 30 8|3-30-8|3.30.8|3_30_8|330 8|33 08', colFecha: 'Entrega', colPlanilla: 'Planilla', colCliente: 'Client', colDni: '', activa: true },
+    { id: 'CHAT', palabra: 'CHAT TONIC|CHATTONIC|CHAT_TONIC|CHAT-TONIC|TONIC', colFecha: 'Timestamp inicio', colPlanilla: 'Nro de Planilla', colCliente: 'Nro de Cliente', colDni: '', activa: true },
     { id: '450', palabra: '4.50|4-50|4_50|4 50|450', colFecha: '', colPlanilla: '', colCliente: '', colDni: '', activa: true },
     { id: 'FLOTA', palabra: 'FLOTA', colFecha: '', colPlanilla: '', colCliente: '', colDni: '', activa: true }
   ],
@@ -416,7 +430,7 @@ const CONFIG_DEF = {
     { codigo: 'aoc', nombre: 'Asset Occupation', meta: null, activo: true },
     { codigo: 'radio', nombre: 'Adherencia al radio', base: 'BEES', numerador: 'contar si AB = VERDADERO', denominador: 'contar AB', mejor: 'alto', meta: 0.90, formato: '%', activo: true },
     { codigo: 'notif', nombre: 'Tiempo de notificación', base: 'BEES', numerador: 'contar si R <> <2 minutes; <10 seconds', denominador: 'contar si F <> 0', mejor: 'bajo', meta: null, formato: '%', activo: true },
-    { codigo: 'refac', nombre: 'Refacturaciones', base: 'REFAC', numerador: 'sumar HL Refacturados', denominador: 'HL pedidos', mejor: 'bajo', meta: 0.01, formato: '%', activo: true }
+    { codigo: 'refac', nombre: 'Refacturaciones', base: '3308 + CHAT', numerador: '(automático) clientes refacturados', denominador: '(automático) clientes atendidos', mejor: 'bajo', meta: 0.01, formato: '%', activo: true }
   ]
 };
 let CONFIG = JSON.parse(JSON.stringify(CONFIG_DEF));
@@ -429,13 +443,14 @@ const KPIS_NUCLEO = {
   efe: { num: 'modEnt', den: 'modTot', fmt: 'pct', mejor: 'alto', tol: 0.05, lbl: 'clientes', sinAg: { num: 'modEntSA', den: 'modTotSA', soloOL: true } },
   rmd: { num: 'rmdSum', den: 'rmdN', fmt: 'dec', mejor: 'alto', tol: 0.04, lbl: 'calificaciones' },
   rmdDet: { num: 'rmdDet', den: 'rmdN', cuenta: true, fmt: 'cnt', mejor: 'bajo', tol: 0.1, lbl: 'calificaciones' },
+  refac: { num: 'refN', den: 'refD', fmt: 'pct', dec: 2, mejor: 'bajo', tol: 0.25, lbl: 'clientes', requiere: 'refac' },   /* clientes refacturados (Chat Tonic) ÷ clientes atendidos (3 30 8) */
   aoc: { num: 'aoSum', den: 'aoN', fmt: 'pct', dec: 0, mejor: 'alto', tol: 0.05, lbl: 'viajes', requiere: 'ao' },
   /* Ocupación de bodega: paletas vendidas / viajes. Se ve en general y por canal, no por OL ni por chofer */
   ob: { num: 'palP', den: 'viajes', fmt: 'dec', mejor: 'alto', tol: 0.05, lbl: 'viajes', soloResumen: true, requiere: 'pal' },
   obMino: { num: 'palMinoP', den: 'viaMino', fmt: 'dec', mejor: 'alto', tol: 0.05, lbl: 'viajes Mino', soloResumen: true, requiere: 'pal', general: { num: 'palP', den: 'viajes' } },
   obSMK: { num: 'palSMKP', den: 'viaSMK', fmt: 'dec', mejor: 'alto', tol: 0.05, lbl: 'viajes SMK', soloResumen: true, requiere: 'pal', general: { num: 'palP', den: 'viajes' } }
 };
-const CAMPOS_NUCLEO = ['hlVta', 'rmdDet', 'aoSum', 'aoN', 'modTotSA', 'modEntSA', 'modEntORchSA', 'viajesT', 'palP', 'palMinoP', 'palSMKP', 'viajesD', 'viajesC', 'viajesS', 'hlPedSA', 'hlRchSA', 'pedSA', 'pedRchSA', 'pal', 'palMino', 'palSMK', 'viaMino', 'viaSMK', 'viajes', 'ped', 'pedRch', 'hlPed', 'hlRch', 'modTot', 'modEnt', 'modEntORch', 'rmdSum', 'rmdN'];
+const CAMPOS_NUCLEO = ['refN', 'refD', 'hlVta', 'rmdDet', 'aoSum', 'aoN', 'modTotSA', 'modEntSA', 'modEntORchSA', 'viajesT', 'palP', 'palMinoP', 'palSMKP', 'viajesD', 'viajesC', 'viajesS', 'hlPedSA', 'hlRchSA', 'pedSA', 'pedRchSA', 'pal', 'palMino', 'palSMK', 'viaMino', 'viaSMK', 'viajes', 'ped', 'pedRch', 'hlPed', 'hlRch', 'modTot', 'modEnt', 'modEntORch', 'rmdSum', 'rmdN'];
 /* Datos de RCH/RMD que se pueden usar como numerador o denominador de un KPI nuevo */
 const REF_NUCLEO = {
   viajes: ['viajes', 'viajes'], pedidos: ['ped', 'pedidos'], pedidosrechazados: ['pedRch', 'pedidos rechazados'],
@@ -819,7 +834,8 @@ function leerConfigLibro(wb) {
   if (col) cfg.columnas = col.filter(r => txt(r.b) && txt(r.d) && txt(r.e)).map(r => ({ base: txt(r.b), campo: txt(r.d), encabezado: txt(r.e) }));
   const bas = tablaConfig(hojaConfig(wb, 'Bases'), { id: ['base', 'nombre'], pal: ['palabraenelnombre', 'palabra'], f: ['columnafecha'], p: ['columnaplanilla'], c: ['columnacliente'], d: ['columnadni'], o: ['columnaol', 'columnaoperador'], a: ['activa', 'activo'] });
   if (bas) cfg.bases = bas.filter(r => txt(r.id)).map(r => ({ id: txt(r.id).toUpperCase(), palabra: txt(r.pal) || txt(r.id), colFecha: txt(r.f), colPlanilla: txt(r.p), colCliente: txt(r.c), colDni: txt(r.d), colOl: txt(r.o), activa: siNo(r.a, true) }));
-  if (bas) for (const d of CONFIG_DEF.bases) if (['450', 'FLOTA'].includes(d.id) && !cfg.bases.some(x => x.id === d.id)) cfg.bases.push(JSON.parse(JSON.stringify(d)));   /* bases de Asset Occupation aunque la hoja Bases no las tenga */
+  if (bas) for (const d of CONFIG_DEF.bases) if (['450', 'FLOTA', '3308', 'CHAT'].includes(d.id) && !cfg.bases.some(x => x.id === d.id)) cfg.bases.push(JSON.parse(JSON.stringify(d)));
+  if (bas) cfg.bases = cfg.bases.filter(x => x.id !== 'REFAC');   /* REFAC quedó reemplazada por 3 30 8 + Chat Tonic */   /* bases de Asset Occupation aunque la hoja Bases no las tenga */
   const kp = tablaConfig(hojaConfig(wb, 'KPIs'), { cod: ['codigo'], n: ['kpi', 'indicador', 'nombre'], b: ['base'], nu: ['numerador'], de: ['denominador'], m: ['mejor'], me: ['meta'], fo: ['formato'], a: ['activo', 'activa'], t: ['tolerancia'] });
   if (kp) cfg.kpis = kp.filter(r => txt(r.n) || txt(r.cod)).map((r, i) => {
     const formato = txt(r.fo);
@@ -1233,9 +1249,11 @@ function procesar(raw) {
   for (const r of raw.SALIDA) rango(D.rSal, fechaTexto(r.fecha));
   /* OL desde otras bases (BEES): por planilla, o por fecha + cliente, para planillas que no están en SALIDA */
   const olPlanB = new Map(), olFCB = new Map(); D.olColBases = [];
+  D.beesDia = {};
   const olPlanBF = new Map(), beesFechas = new Set(), olPCB = new Map(), olFCB2 = new Map(), olCliB = new Map();   /* rechazo oficial: planilla → fecha → OL de BEES */
   for (const b of CONFIG.bases) {
     const regs = raw.EXTRA[b.id]; if (!regs || !regs.length) continue;
+    if (b.id !== 'BEES' && !b.colOl) continue;
     const enc = raw.EXTRA_ENC[b.id] || [];
     const cO = b.colOl ? (colPorLetra(b.colOl, raw.EXTRA_ORD && raw.EXTRA_ORD[b.id]) || (/^[A-Za-z]{1,3}$/.test(b.colOl.trim()) ? ([...enc].includes(norm(b.colOl)) ? norm(b.colOl) : null) : resolverCol(b.colOl, enc))) : (['ol', 'operadorlogistico', 'nombreol', 'olnombre', 'transportista', 'nombretransportista', 'empresatransporte', 'operador'].map(x => resolverCol(x, enc)).find(Boolean) || null);
     if (!cO) continue;
@@ -1244,7 +1262,7 @@ function procesar(raw) {
     for (const r of regs) {
       const o = String(r[cO] == null ? '' : r[cO]).trim(); if (!o) continue;
       if (cP) { const p = llaveP(r[cP]); if (p && !olPlanB.has(p)) olPlanB.set(p, o); }
-      if (cP) { const p = llaveP(r[cP]), fb = cF ? fechaTexto(r[cF]) : ''; if (p) { let m = olPlanBF.get(p); if (!m) olPlanBF.set(p, m = new Map()); if (!m.has(fb)) m.set(fb, o); if (fb) beesFechas.add(fb); } }
+      if (cP) { const p = llaveP(r[cP]), fb = cF ? fechaTexto(r[cF]) : ''; if (p) { let m = olPlanBF.get(p); if (!m) olPlanBF.set(p, m = new Map()); if (!m.has(fb)) m.set(fb, o); if (fb) { beesFechas.add(fb); D.beesDia[fb] = (D.beesDia[fb] || 0) + 1; } } }
       if (cC && cF) { const c = cliN(r[cC]), fb = fechaTexto(r[cF]); if (c && fb) { const k = fb + '|' + c; if (!olFCB2.has(k)) olFCB2.set(k, o); let m = olCliB.get(c); if (!m) olCliB.set(c, m = new Map()); const l = m.get(fb) || []; if (!l.includes(o)) l.push(o); m.set(fb, l); } }
       if (cP && cC) { const p = llaveP(r[cP]), c = cliN(r[cC]), fb = cF ? fechaTexto(r[cF]) : ''; if (p && c) { const k = p + '|' + c; let m = olPCB.get(k); if (!m) olPCB.set(k, m = new Map()); if (!m.has(fb)) m.set(fb, o); } }
       if (cC && cF) { const k = r[cF] + '|' + cliN(r[cC]); if (!olFCB.has(k)) olFCB.set(k, o); }
@@ -1276,7 +1294,8 @@ function procesar(raw) {
     for (let d = 0; d <= 3; d++) { const out = []; for (const fx of d ? [masDias(f, -d), masDias(f, d)] : [f]) { const l = m.get(fx); if (l) for (const o of l) if (ok(o) && !out.some(y => mapOL(y).ol === mapOL(o).ol)) out.push(o); } if (out.length) return out; }
     return [];
   }
-  const hayBees = f => { if (!beesFechas.size) return false; for (let d = -3; d <= 3; d++) if (beesFechas.has(d ? masDias(f, d) : f)) return true; return false; };
+  /* ¿BEES tiene datos de ese mismo día? Si no (por ejemplo, el día todavía no está en la descarga de BEES), el oficial usa el OL de la bajada */
+  const hayBees = f => beesFechas.has(f);
   function olDeBases(p, f, c) { return (p && olPlanB.get(p)) || (f && c && olFCB.get(f + '|' + c)) || ''; }
   /* ¿La bajada de RCH trae el OL (como la columna G del taco)? Se usa si la mayoría coincide con los OL oficiales o EB */
   let usarOlRch = false;
@@ -1385,6 +1404,7 @@ function procesar(raw) {
       if (ob) { olOfiF = 'BEES'; olOfi = olExcluido(ob, f) ? OL_OCULTO : mapOL(ob).ol === AGUANOR ? '' : ob; if (!olOfi) olOfiF = 'BEES (Aguanor u OL no oficial)'; }
       else if (hayBees(f)) { olOfiF = 'No está en BEES'; olOfi = ''; }
       else { olOfiF = 'Sin BEES ese día (OL de la bajada)'; olOfi = oculto ? OL_OCULTO : (olFin !== 'Sin OL' && mapOL(olFin).ol !== AGUANOR ? olFin : ''); }
+      if (num(r.hlRch) > 0 || (S > 0 && X <= 0)) { const dd = D.ofiDia || (D.ofiDia = {}), m = dd[f] || (dd[f] = {}), bb = m[olOfiF] || (m[olOfiF] = [0, 0, 0]); bb[0]++; bb[1] += num(r.hlRch); bb[2] += (S > 0 && X <= 0) ? 1 : 0; }
       const k = olOfiF; D.ofiFuente = D.ofiFuente || {}; const b = D.ofiFuente[k] || (D.ofiFuente[k] = [0, 0, 0]); b[0]++; b[1] += num(r.hlRch); b[2] += (S > 0 && X <= 0) ? 1 : 0;
       if (olOfi && olOfi !== OL_OCULTO && !oculto && olFin !== 'Sin OL' && mapOL(olFin).ol !== AGUANOR && mapOL(olOfi).ol !== mapOL(olFin).ol && (num(r.hlRch) > 0 || (S > 0 && X <= 0))) D.ofiDistinto = (D.ofiDistinto || 0) + 1; }
     rch.push({
@@ -1658,7 +1678,7 @@ function procesar(raw) {
 
   /* Filas agregadas por fecha + chofer + OL + canal */
   const grupos = new Map();
-  const base = (f, dni, ol, canal) => ({ f, dni, ol, canal, viajesD: 0, viajesT: 0, viajesC: 0, viajesS: 0, pal: 0, palMino: 0, palSMK: 0, palP: 0, palMinoP: 0, palSMKP: 0, viaMino: 0, viaSMK: 0, viajes: 0, ped: 0, pedRch: 0, hlPed: 0, hlRch: 0, hlVta: 0, hlPedSA: 0, hlRchSA: 0, pedSA: 0, pedRchSA: 0, modTot: 0, modEnt: 0, modEntORch: 0, modTotSA: 0, modEntSA: 0, modEntORchSA: 0, aoSum: 0, aoN: 0, rmdDet: 0, rmdSum: 0, rmdN: 0 });
+  const base = (f, dni, ol, canal) => ({ f, dni, ol, canal, viajesD: 0, viajesT: 0, viajesC: 0, viajesS: 0, pal: 0, palMino: 0, palSMK: 0, palP: 0, palMinoP: 0, palSMKP: 0, viaMino: 0, viaSMK: 0, viajes: 0, ped: 0, pedRch: 0, hlPed: 0, hlRch: 0, hlVta: 0, hlPedSA: 0, hlRchSA: 0, pedSA: 0, pedRchSA: 0, modTot: 0, modEnt: 0, modEntORch: 0, modTotSA: 0, modEntSA: 0, modEntORchSA: 0, aoSum: 0, aoN: 0, rmdDet: 0, rmdSum: 0, rmdN: 0, refN: 0, refD: 0 });
   /* Viajes como el taco: cada fila de una planilla vale 1 / (filas de esa planilla).
      Así una planilla que reparte en Mino y SMK suma 1 viaje en total, repartido entre los canales. */
   const grupOL = new Map();
@@ -1734,6 +1754,56 @@ const planGrupo = new Map();
     g.rmdSum += x.pt; g.rmdN++; if (x.pt <= CONFIG.rmdDetractor) g.rmdDet++;
   }
   D.rmdSinPlan = rmdSinPlan.length;
+
+  /* ---------- Refacturaciones: 3 30 8 (clientes atendidos por planilla) × Chat Tonic (refacturado + motivo) ----------
+     Como el Excel: clave planilla + cliente; Refacturó = columna "Hubo refacturación" (o "Refacturado") de Chat Tonic (si no está: NO);
+     chofer y OL = SALIDA por planilla (con la fecha, ±3 días). Una visita = planilla + cliente + día. */
+  D.refac = { visitas: 0, refac: 0, sinChat: 0, chatSinVisita: 0, sinChofer: 0, falta: '' };
+  const refacDet = [];
+  { const R3 = raw.EXTRA['3308'], RC = raw.EXTRA['CHAT'];
+    if (!R3 || !R3.length) D.refac.falta = 'Falta la bajada 3 30 8 en la carpeta (el nombre del archivo tiene que decir 3308 o 3 30 8)';
+    else if (!RC || !RC.length) D.refac.falta = 'Falta la bajada de Chat Tonic en la carpeta (el nombre del archivo tiene que decir Chat Tonic)';
+    else {
+      const e3 = raw.EXTRA_ENC['3308'] || new Set(), ec = raw.EXTRA_ENC['CHAT'] || new Set(), rc3 = n => resolverCol(n, e3), rcc = n => resolverCol(n, ec);
+      const c3 = { p: rc3('Planilla'), c: rc3('Client') || rc3('Cliente'), fe: rc3('Entrega'), fp: rc3('F.Pedido') || rc3('Fecha Pedido'), hl: rc3('Hecto Litr') || rc3('Hectolitros'), imp: rc3('Importe Total') };
+      const cc = { p: rcc('Nro de Planilla'), c: rcc('Nro de Cliente'), f: rcc('Timestamp inicio'), ref: rcc('Refacturado') || rcc('Hubo refacturación') || rcc('Hubo refacturacion'), mot: rcc('Motivo de refacturación') || rcc('Motivo de refacturacion'), monto: rcc('Monto refacturación ajustado'), monto2: rcc('Monto refacturación'), hubo: rcc('Hubo refacturación') };
+      D.refac.cols = { '3308': c3, chat: cc };
+      const faltan = [!c3.p && '3 30 8: Planilla', !c3.c && '3 30 8: Client', !cc.p && 'Chat Tonic: Nro de Planilla', !cc.c && 'Chat Tonic: Nro de Cliente', !cc.ref && 'Chat Tonic: Hubo refacturación'].filter(Boolean);
+      if (faltan.length) D.refac.falta = 'Faltan columnas: ' + faltan.join(', ');
+      else {
+        const fT = v => { if (typeof v === 'string') v = v.trim().split(/[ T]/)[0]; return fechaTexto(v); };
+        const esSi = v => { const n = norm(v); return !!n && (VAL_SI.has(n) || n === 'refacturado' || n.startsWith('si')); };
+        /* Chat Tonic: planilla + cliente → registros (fecha, refacturado, motivo, monto) */
+        const chat = new Map();
+        for (const r of RC) { const p = llaveP(r[cc.p]), c = cliN(r[cc.c]); if (!p || !c) continue; const k = p + '|' + c; const l = chat.get(k) || []; l.push({ f: cc.f ? fT(r[cc.f]) : '', ref: esSi(r[cc.ref]), mot: String(r[cc.mot] == null ? '' : r[cc.mot]).trim(), monto: (cc.monto && num(r[cc.monto])) || (cc.monto2 ? num(r[cc.monto2]) : 0), usado: false }); chat.set(k, l); }
+        /* 3 30 8: una visita por planilla + cliente + día (las filas son líneas de producto) */
+        const vis = new Map();
+        for (const r of R3) { const p = llaveP(r[c3.p]), c = cliN(r[c3.c]); if (!p || !c) continue;
+          const f = (c3.fe && fT(r[c3.fe])) || (c3.fp && fT(r[c3.fp])) || ''; if (!f) continue;
+          const k = f + '|' + p + '|' + c; const v = vis.get(k) || { f, p, c, hl: 0, imp: 0 }; v.hl += c3.hl ? num(r[c3.hl]) : 0; v.imp += c3.imp ? num(r[c3.imp]) : 0; vis.set(k, v); }
+        const dias = (a, b) => (a && b) ? Math.abs((Date.parse(a) - Date.parse(b)) / 864e5) : 0;
+        for (const v of vis.values()) {
+          D.refac.visitas++;
+          /* chat de esa planilla + cliente, en la fecha más cercana (±3 días; sin fecha en Chat Tonic, el primero) */
+          const l = chat.get(v.p + '|' + v.c); let ch = null;
+          if (l) { let bd = 4; for (const x of l) { const d = dias(x.f, v.f); if (d < bd) { bd = d; ch = x; } } if (ch) ch.usado = true; }
+          if (!ch) D.refac.sinChat++;
+          const ref = !!(ch && ch.ref);
+          let sx = salPF.get(v.f + '|' + v.p); for (let d = 1; !sx && d <= 3; d++) sx = salPF.get(masDias(v.f, -d) + '|' + v.p) || salPF.get(masDias(v.f, d) + '|' + v.p);
+          const canal = canalPlanCli(v.p, v.c) || 'Mino';
+          let ol = sx ? sx.ol : '', dni = sx ? sx.dni : '';
+          const oculto = !sx || !ol || mapOL(ol).ol === AGUANOR || olExcluido(ol, v.f);
+          if (!sx) D.refac.sinChofer++;
+          let g;
+          if (oculto) { const kh = 'FH|' + v.f + '|' + canal; g = grupos.get(kh); if (!g) { g = base(v.f, '', OL_OCULTO, canal); g.olOrig = 'Refacturaciones sin chofer u OL propio'; grupos.set(kh, g); } }
+          else { const o = mapOL(ol), kf = 'F|' + v.f + '|' + dni + '|' + o.ol + '|' + o.orig + '|' + canal; g = grupos.get(kf); if (!g) { g = base(v.f, dni, o.ol, canal); g.olOrig = o.orig; grupos.set(kf, g); } }
+          g.refD++; if (ref) { g.refN++; D.refac.refac++; }
+          if (ref) refacDet.push([v.f, v.p, v.c, oculto ? OL_OCULTO : mapOL(ol).ol, canal, oculto ? '' : dni, ch.mot || 'Sin motivo', Math.round(v.hl * 1000) / 1000, Math.round(v.imp * 100) / 100, Math.round((ch.monto || 0) * 100) / 100]);
+        }
+        for (const l of chat.values()) for (const x of l) if (x.ref && !x.usado) D.refac.chatSinVisita++;
+      }
+    }
+  }
   /* RMD por mes, para comparar con el dashboard */
   { const RM = {}; const mm = f => RM[f.slice(0, 7)] || (RM[f.slice(0, 7)] = { leidas: 0, asig: 0, sumAsig: 0, sinPlan: 0, sumSin: 0 });
     for (const [m, n] of Object.entries(D.rmdLeidasMes || {})) mm(m + '-01').leidas = n;
@@ -1828,6 +1898,7 @@ const planGrupo = new Map();
     if (nuc) {
       const k = Object.assign({ id: kc.codigo, nombre: kc.nombre || kc.codigo, meta: kc.meta }, nuc, kc.tol != null ? { tol: kc.tol } : {});
       if (nuc.requiere === 'pal' && !tienePal) k.pendiente = 'Falta la columna "Paletas" en RCH';
+      if (nuc.requiere === 'refac' && !(D.refac && D.refac.visitas)) k.pendiente = (D.refac && D.refac.falta) || 'Falta la bajada 3 30 8 o la de Chat Tonic en la carpeta';
       if (nuc.requiere === 'ao' && !(D.ao && D.ao.viajes)) k.pendiente = (D.ao && D.ao.falta) || 'Falta el reporte 4.50 o el maestro de flota en la carpeta';
       kpis.push(k); continue;
     }
@@ -1973,6 +2044,7 @@ const planGrupo = new Map();
     detalle: rch.map(x => [x.f, x.planilla, x.cliente, mapOL(x.ol).ol === AGUANOR ? OL_OCULTO : mapOL(x.ol).ol, x.canal, x.S, x.V, x.X, x.pedRch, x.mod || '-', x.modTot, x.modEnt, x.modEntORch, x.hlRch, x.motRch, mapOL(x.ol).ol === AGUANOR ? '' : x.dni, x.conRch, x.chofer || '', x.olNO ? mapOL(x.olNO).ol : '', x.hlVta, x.olNOf || '', x.ped, mapOL(x.ol).ol === AGUANOR ? 1 : 0, x.olOfi ? (x.olOfi === OL_OCULTO ? OL_OCULTO : mapOL(x.olOfi).ol) : 'Aguanor', x.olOfiF, x.cand || null]),
     modoMod: CONFIG.modoMod,
     ajustes: { claveFiltro: CONFIG.claveFiltro, filtroInicial: CONFIG.filtroInicial },
+    refacDet,
     modoViajes: CONFIG.modoViajes, olOculto: OL_OCULTO, olNoListar: [OL_OCULTO, SINPLAN, 'Sin OL'],
     filas, choferes, ols, kpis, campos: CAMPOS_NUCLEO.concat(camposExtra), config: raw.config,
     lectura: { fecha: new Date().toISOString(), archivos },
@@ -2276,6 +2348,14 @@ function renderOL() {
 
   renderOLAguanor(fil, rows, agR);
 }
+function notaOficialDias() {
+  const D = DATA.diagnostico || {}, od = D.ofiDia || {}, bd = D.beesDia || {}, r = rangoActual();
+  const fechas = Object.keys(od).filter(f => f >= r.desde && f <= r.hasta).sort();
+  if (!fechas.length) return '';
+  const fu = ['BEES', 'No está en BEES', 'BEES (Aguanor u OL no oficial)', 'Sin BEES ese día (OL de la bajada)'];
+  const c = (m, k, i) => m[k] ? (i === 1 ? nf1.format(m[k][1]) : nf0.format(m[k][i])) : '—';
+  return `<details style="margin-top:8px"><summary style="cursor:pointer;font-size:13px;color:var(--accent)">Oficial por día: de dónde salió el OL de cada rechazo (HL rechazados)</summary><div class="tablewrap" style="max-height:320px;margin-top:6px"><table><thead><tr><th class="l">Día</th><th>Filas de BEES ese día</th><th>Por la planilla en BEES</th><th>No está en BEES (Aguanor)</th><th>BEES dice Aguanor / no oficial</th><th>Sin BEES ese día (OL de la bajada)</th></tr></thead><tbody>${fechas.map(f => `<tr><td class="l">${fLarga(f)}</td><td class="num">${bd[f] ? nf0.format(bd[f]) : '<b style="color:var(--bad)">0</b>'}</td>${fu.map(k => `<td class="num">${c(od[f], k, 1)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details>`;
+}
 function notaCambios() {
   const D = DATA.diagnostico || {}, c = D.olNOcambio || {}, n = (D.ctl && D.ctl.salOtraFecha) || 0;
   const lst = Object.entries(c).sort((a, b) => b[1][1] - a[1][1]).map(([k, b]) => `${esc(k)}: ${nf0.format(b[0])} filas, ${nf1.format(b[1])} HL rch, ${nf0.format(b[2])} ped. rch`).join(' · ');
@@ -2297,7 +2377,7 @@ function renderOLAguanor(fil, rows, agR) {
     <p class="sub" style="margin:0;max-width:820px;white-space:normal">${ofi ? 'Oficial: cada rechazo va al OL de su planilla en BEES; si no está en BEES queda en Aguanor y no cuenta.' : 'No oficial: lo que la bajada pasó a Aguanor vuelve al OL que atendió a ese cliente: BEES (planilla + cliente, o la visita a ese cliente), la planilla en BEES, D.Fletero, SALIDA con la fecha de la planilla y, por último, el OL que atendió a ese cliente en la bajada en la fecha más cercana (±30 días). Si no aparece, queda en Aguanor.'} El % es sobre el total del OL (HL venta bruta y pedidos).</p></div>
     <button class="btn" id="btnAgDet">Descargar detalle (.xlsx)</button></div>
   <div class="tablewrap"><table><thead><tr><th class="l">OL</th><th>HL vta bruta</th><th>HL rechazados</th><th>RCH HL</th><th>Pedidos</th><th>Pedidos rechazados</th><th>RCH PED</th></tr></thead>
-  <tbody>${rows.map(x => fila(x.ol, x.s.hlVta, hr(x.s), x.s.ped, pr(x.s))).join('')}${filaAg}${fila('Total', T.hlVta, hr(T), T.ped, pr(T), 'total')}</tbody></table></div>${verAg ? notaCambios() : ''}`;
+  <tbody>${rows.map(x => fila(x.ol, x.s.hlVta, hr(x.s), x.s.ped, pr(x.s))).join('')}${filaAg}${fila('Total', T.hlVta, hr(T), T.ped, pr(T), 'total')}</tbody></table></div>${verAg ? notaCambios() + notaOficialDias() : ''}`;
   document.getElementById('btnAgDet').onclick = () => {
     const r = rangoActual();
     const olBaj = x => x[3] === DATA.olOculto ? (x[22] === 1 ? 'Aguanor' : 'EB / otros') : x[3];
@@ -2320,7 +2400,7 @@ function renderMatriz() {
   let ols = [];
   if (porOL) { const go = noListar(agrupar(fil, x => x.ol)); ols = [...go.entries()].sort((a, b) => a[0].localeCompare(b[0], 'es')).map(([ol, rs]) => ({ ol, g: agrupar(rs, clave), t: sumar(rs) })); }
   /* Orden de Día a día pedido por el usuario */
-  const ORD = ['obMino', 'obSMK', 'ob', 'rchHL', 'rchPed', 'adh', 'efe', 'x_radio', 'x_notif', 'rmd', 'rmdDet', 'x_refac', 'aoc'];
+  const ORD = ['obMino', 'obSMK', 'ob', 'rchHL', 'rchPed', 'adh', 'efe', 'x_radio', 'x_notif', 'rmd', 'rmdDet', 'refac', 'x_refac', 'aoc'];
   const pos = k => { const i = ORD.indexOf(k.id); return i < 0 ? 99 : i; };
   const body = KPIS.slice().sort((a, b) => pos(a) - pos(b)).map(k => {
     if (k.pendiente) return `<tr><td>${esc(k.nombre)}</td>${keys.map(() => '<td class="na">—</td>').join('')}<td class="na">—</td></tr>`;
@@ -2554,6 +2634,38 @@ function renderMotivos() {
   document.querySelectorAll('#tblMotMod tr[data-dni]').forEach(tr => tr.onclick = () => abrirChofer(tr.dataset.dni));
 }
 
+/* ---------- Refacturaciones (3 30 8 × Chat Tonic) ---------- */
+function renderRefac() {
+  const D = (DATA.diagnostico && DATA.diagnostico.refac) || {};
+  const k = KPIS.find(x => x.id === 'refac');
+  if (!D.visitas) { $('refSub').textContent = D.falta || 'Faltan la bajada 3 30 8 y la de Chat Tonic en la carpeta.'; $('refRes').innerHTML = ''; $('tblRefMot').innerHTML = $('tblRefOL').innerHTML = $('tblRefCh').innerHTML = ''; return; }
+  const r = rangoActual(), dni = dniSeleccionado();
+  const fil = filtrar(r);
+  const tot = sumar(fil);
+  const det = (DATA.refacDet || []).filter(x => x[0] >= r.desde && x[0] <= r.hasta && (!S.ol || x[3] === S.ol) && (!S.canal || x[4] === S.canal) && (!dni || x[5] === dni));
+  const p2 = (a, b) => b ? (100 * a / b).toFixed(2).replace('.', ',') + '%' : '—';
+  const monto = det.reduce((a, x) => a + (x[9] || 0), 0);
+  $('refSub').textContent = 'Clientes atendidos = planilla + cliente + día de la bajada 3 30 8. Refacturado = columna "Hubo refacturación" de Chat Tonic para esa planilla y cliente (±3 días); si no está, NO. Chofer y OL: SALIDA por planilla con su fecha.';
+  $('refRes').innerHTML = `<div class="minis" style="margin-bottom:10px"><div class="mini"><span>Clientes atendidos</span><b>${nf0.format(tot.refD)}</b></div><div class="mini"><span>Refacturados</span><b>${nf0.format(tot.refN)}</b></div><div class="mini"><span>% refacturación</span><b>${p2(tot.refN, tot.refD)}</b>${k && k.meta != null ? ` <small>meta ${p2(k.meta, 1)}</small>` : ''}</div><div class="mini"><span>Monto refacturado</span><b>$ ${nf0.format(monto)}</b></div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="btnExpRef">⬇ Descargar refacturaciones (${nf0.format(det.length)})</button></div>
+    <p class="sub" style="margin:8px 0 0;white-space:normal">Control (todas las fechas): ${nf0.format(D.visitas)} visitas en la 3 30 8 · ${nf0.format(D.refac)} refacturadas · ${nf0.format(D.sinChat)} sin registro en Chat Tonic (cuentan como NO) · ${nf0.format(D.sinChofer)} sin la planilla en SALIDA (suman al total, sin chofer) · ${nf0.format(D.chatSinVisita)} refacturaciones de Chat Tonic que no se encontraron en la 3 30 8.</p>`;
+  $('btnExpRef').onclick = () => descargarCSV('refacturaciones_' + r.desde + '_al_' + r.hasta + '.csv', [['Fecha', 'Planilla', 'Cliente', 'Operador logístico', 'Canal', 'Chofer', 'DNI', 'Motivo de refacturación', 'HL', 'Importe total', 'Monto refacturación']]
+    .concat(det.slice().sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0).map(x => [fLarga(x[0]), x[1], x[2], x[3] === DATA.olOculto ? 'Sin chofer / otros' : x[3], x[4], x[5] ? nombreChofer(x[5]) : '', x[5] || '', x[6], x[7], x[8], x[9]])));
+  /* motivos */
+  const gm = agrupar(det, x => x[6] || 'Sin motivo');
+  const rm = [...gm.entries()].map(([m, rs]) => ({ m, n: rs.length, monto: rs.reduce((a, x) => a + (x[9] || 0), 0) })).sort((a, b) => b.n - a.n);
+  $('tblRefMot').innerHTML = `<thead><tr><th class="l">Motivo</th><th>Refacturaciones</th><th>%</th><th>Monto</th></tr></thead><tbody>${rm.map(x => `<tr><td class="l" style="white-space:normal">${esc(x.m)}</td><td class="num">${nf0.format(x.n)}</td><td class="num">${pctTxt(x.n, det.length)} ${barra(x.n, det.length)}</td><td class="num">$ ${nf0.format(x.monto)}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Sin refacturaciones en el período.</td></tr>'}</tbody><tfoot><tr class="total"><td class="l"><b>Total</b></td><td class="num"><b>${nf0.format(det.length)}</b></td><td class="num">100%</td><td class="num"><b>$ ${nf0.format(monto)}</b></td></tr></tfoot>`;
+  /* por OL */
+  const go = agrupar(fil.filter(x => x.refD), x => x.ol); noListar(go);
+  const ro = [...go.entries()].map(([ol, rs]) => { const s = sumar(rs); return { ol, d: s.refD, n: s.refN }; }).sort((a, b) => a.ol.localeCompare(b.ol, 'es'));
+  $('tblRefOL').innerHTML = `<thead><tr><th class="l">OL</th><th>Clientes atendidos</th><th>Refacturados</th><th>% refacturación</th></tr></thead><tbody>${ro.map(x => `<tr><td class="l"><b>${esc(x.ol)}</b></td><td class="num">${nf0.format(x.d)}</td><td class="num">${nf0.format(x.n)}</td><td class="num"><b>${p2(x.n, x.d)}</b></td></tr>`).join('')}<tr class="total"><td class="l"><b>Total</b></td><td class="num">${nf0.format(tot.refD)}</td><td class="num">${nf0.format(tot.refN)}</td><td class="num"><b>${p2(tot.refN, tot.refD)}</b></td></tr></tbody>`;
+  /* por chofer */
+  const gc = agrupar(fil.filter(x => x.dni && x.refD), x => x.dni);
+  const rc = [...gc.entries()].map(([d, rs]) => { const s = sumar(rs); const mots = agrupar(det.filter(x => x[5] === d), x => x[6]); const top = [...mots.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 2).map(([m, l]) => m + ' (' + l.length + ')').join(' · '); return { d, nombre: nombreChofer(d), ol: (DATA.choferes[d] || {}).ol || rs[0].ol, cl: s.refD, n: s.refN, top }; }).filter(x => x.n > 0).sort((a, b) => b.n - a.n || b.n / b.cl - a.n / a.cl);
+  $('tblRefCh').innerHTML = `<thead><tr><th class="l">Chofer</th><th class="l">OL</th><th>Clientes atendidos</th><th>Refacturados</th><th>% refacturación</th><th class="l">Motivos principales</th></tr></thead><tbody>${rc.map(x => `<tr data-dni="${esc(x.d)}" style="cursor:pointer"><td class="l"><b>${esc(x.nombre)}</b></td><td class="l">${esc(x.ol)}</td><td class="num">${nf0.format(x.cl)}</td><td class="num">${nf0.format(x.n)}</td><td class="num"><b>${p2(x.n, x.cl)}</b></td><td class="l" style="white-space:normal">${esc(x.top)}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Ningún chofer refacturó en el período.</td></tr>'}</tbody>`;
+  document.querySelectorAll('#tblRefCh tr[data-dni]').forEach(tr => tr.onclick = () => abrirChofer(tr.dataset.dni));
+}
+
 function consultarCliente() {
   const q = String($('inCli').value || '').trim(); const d = q.replace(/\D/g, ''); const c = d.length >= 3 ? d.replace(/^0+(?=\d)/, '') : q.toUpperCase();
   if (!c) { $('outCli').innerHTML = ''; return; }
@@ -2693,6 +2805,7 @@ function render() {
   if (S.vista === 'dias') renderMatriz();
   if (S.vista === 'calidad') renderCalidad();
   if (S.vista === 'motivos') renderMotivos();
+  if (S.vista === 'refac') renderRefac();
   if (S.vista !== 'choferes') $('cntCh').textContent = filasChoferes().filter(x => x.viajes >= S.min).length;
 }
 
@@ -2720,7 +2833,7 @@ function iniciarVistas(datos) {
    - Si el navegador no permite recordar carpetas, usa el selector clásico.
    ===================================================================== */
 (function () {
-  const VERSION_TABLERO = '2026-10-22 15:15';
+  const VERSION_TABLERO = '2026-10-23 13:30';
   const g = id => document.getElementById(id);
   function mensaje(t, error) { const m = g('msg'); m.textContent = t; m.className = error ? 'err' : ''; }
   const hora = d => d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
