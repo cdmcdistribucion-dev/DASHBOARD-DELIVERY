@@ -91,6 +91,15 @@ h1{margin:6px 0 4px;font-size:30px;line-height:1.15;color:var(--tx)}
 .det div b{color:var(--tx2)}
 .empty{padding:22px;text-align:center;color:var(--mut);font-size:14px}
 .nota{color:var(--mut);font-size:12px;margin-top:14px;line-height:1.45}
+.fb{margin-top:12px;padding:16px}
+.fb .t{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;color:var(--tx2)}
+.fb .t svg{width:20px;height:20px;stroke:var(--verde)}
+.fb p{margin:4px 0 10px;color:var(--mut);font-size:13px}
+.fb select,.fb textarea{width:100%;background:#f7f7f8;border:1px solid var(--line);border-radius:10px;padding:11px;font-size:15px;color:var(--tx2);outline:none}
+.fb textarea{min-height:92px;resize:vertical;margin-top:8px;font-family:inherit}
+.fb select:focus,.fb textarea:focus{border-color:var(--amar);background:#fff}
+.fb .btn{margin-top:10px;padding:13px}
+.fb .ok{color:var(--ok);font-size:13px;margin-top:8px;min-height:18px}
 </style>
 </head>
 <body>
@@ -124,6 +133,14 @@ h1{margin:6px 0 4px;font-size:30px;line-height:1.15;color:var(--tx)}
       <svg class="chev" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
     </label>
     <div class="hero" id="hero"></div>
+    <div class="card fb" id="fb">
+      <div class="t"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Mi comentario</div>
+      <p>Contanos por qué quedaste en esta posición o por qué un indicador te dio así. Le llega a tu supervisor.</p>
+      <select id="fbKpi" aria-label="Indicador"></select>
+      <textarea id="fbTxt" maxlength="600" placeholder="Ej.: el cliente estaba cerrado y por eso el rechazo…"></textarea>
+      <button class="btn" id="fbEnv" type="button">Enviar comentario</button>
+      <div class="ok" id="fbOk"></div>
+    </div>
     <div class="sect"><span class="eti">Mis indicadores</span></div>
     <div class="grid" id="misK"></div>
     <div class="sect"><span class="eti">Ranking</span><select id="selKpi" aria-label="Ordenar ranking por"></select></div>
@@ -135,7 +152,7 @@ h1{margin:6px 0 4px;font-size:30px;line-height:1.15;color:var(--tx)}
 (function () {
   const $ = id => document.getElementById(id);
   const nf = d => new Intl.NumberFormat('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d });
-  const fmt = (k, v) => { if (v == null || !isFinite(v)) return '—'; if (k.fmt === 'cnt') return nf(0).format(Math.round(v)); const d = k.dec != null ? k.dec : (k.fmt === 'pct' ? 1 : 2); return k.fmt === 'pct' ? nf(d).format(v * 100) + '%' : nf(2).format(v); };
+  const fmt = (k, v) => { if (v == null || !isFinite(v)) return '—'; if (k.fmt === 'pts') return nf(1).format(v) + ' pts'; if (k.fmt === 'cnt') return nf(0).format(Math.round(v)); const d = k.dec != null ? k.dec : (k.fmt === 'pct' ? 1 : 2); return k.fmt === 'pct' ? nf(d).format(v * 100) + '%' : nf(2).format(v); };
   const estado = (k, v) => { if (v == null || !isFinite(v) || k.meta == null) return 'none'; const t = k.tol || 0; if (k.mejor === 'bajo') return v <= k.meta ? 'ok' : v <= k.meta * (1 + t) ? 'warn' : 'bad'; return v >= k.meta ? 'ok' : v >= k.meta * (1 - t) ? 'warn' : 'bad'; };
   const TROFEO = '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>';
   const TXT = { ok: 'En meta', warn: 'Cerca de la meta', bad: 'Fuera de meta', none: 'Sin meta' };
@@ -162,7 +179,7 @@ h1{margin:6px 0 4px;font-size:30px;line-height:1.15;color:var(--tx)}
     if (!d || p.length !== 3 || p !== (dig || d).slice(0, 3)) return false;
     const h = (await sha('dimc:' + d)).slice(0, 20);
     if (!D.u.includes(h)) return 'nouser';
-    yo = { h, nombre: D.n[h] && D.n[h][0], ol: D.n[h] && D.n[h][1] };
+    yo = { h, d, nombre: D.n[h] && D.n[h][0], ol: D.n[h] && D.n[h][1] };
     if (recordar) ls.set('mrUser', JSON.stringify({ d, p })); else ls.set('mrUser', null);
     mostrarApp(); return true;
   }
@@ -181,9 +198,9 @@ h1{margin:6px 0 4px;font-size:30px;line-height:1.15;color:var(--tx)}
   function mostrarApp() {
     $('vLogin').classList.add('hidden'); $('vApp').classList.remove('hidden');
     $('hNom').textContent = 'Hola, ' + (yo.nombre || 'chofer'); $('hOl').textContent = (yo.ol || '') + ' · indicadores y ranking'; $('btnSalir').classList.remove('hidden');
-    $('selKpi').innerHTML = D.kpis.map(k => `<option value="${k.id}">${esc(k.nombre)}</option>`).join('');
-    st.k = st.k || D.rankDef || (D.kpis[0] && D.kpis[0].id); $('selKpi').value = st.k;
-    pintarSeg(); llenarPer(); render();
+    $('selKpi').innerHTML = '<option value="general">Todos los indicadores</option>' + D.kpis.filter(k => !k.oculto).map(k => `<option value="${k.id}">${esc(k.nombre)}</option>`).join('');
+    st.k = st.k || (D.kpis.some(k => k.id === D.rankDef && !k.oculto) ? D.rankDef : (D.kpis.find(k => !k.oculto) || {}).id); $('selKpi').value = st.k;
+    pintarSeg(); llenarPer(); llenarFb(); render();
   }
   function pintarSeg() { document.querySelectorAll('#seg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.t === st.t)); }
   function llenarPer() { const ps = periodos(); $('selPer').innerHTML = ps.map(p => `<option value="${p.id}">${esc(p.label)}</option>`).join(''); if (!ps.some(p => p.id === st.p)) st.p = ps[0] ? ps[0].id : ''; $('selPer').value = st.p; }
@@ -193,25 +210,68 @@ h1{margin:6px 0 4px;font-size:30px;line-height:1.15;color:var(--tx)}
 
   function render() {
     const per = D.periodos.find(p => p.id === st.p && p.tipo === st.t);
-    const ki = D.kpis.findIndex(k => k.id === st.k), k = D.kpis[ki];
+    const gen = st.k === 'general';
+    const ki = gen ? D.kpis.length : D.kpis.findIndex(k => k.id === st.k), k = gen ? { id: 'general', nombre: 'Todos los indicadores', fmt: 'pts', mejor: 'alto', meta: null } : D.kpis[ki];
     if (!per || !k) { $('hero').innerHTML = '<div class="empty">Sin datos para este período.</div>'; $('misK').innerHTML = ''; $('lista').innerHTML = ''; return; }
     /* ranking igual al del dashboard: choferes con el mínimo de viajes del período, ordenados por el KPI elegido */
-    const filas = per.f.filter(r => r[3] >= per.min).map(r => ({ h: r[0], nom: r[1], ol: r[2], vj: r[3], v: r[4] }));
+    const filas = per.f.filter(r => r[3] >= per.min).map(r => ({ h: r[0], nom: r[1], ol: r[2], vj: r[3], v: r[4].slice() }));
+    /* Todos los indicadores: puntaje 0-100 por KPI (el mejor 100, el peor 0) y promedio, igual que en el tablero */
+    if (gen) { const ac = filas.map(() => [0, 0]);
+      D.kpis.forEach((kk, j) => { const con = filas.map((x, i) => [i, x.v[j]]).filter(e => e[1] != null && isFinite(e[1])); if (con.length < 2) return;
+        con.sort((a, b) => kk.mejor === 'bajo' ? a[1] - b[1] : b[1] - a[1]);
+        for (let i = 0; i < con.length;) { let t = i; while (t + 1 < con.length && con[t + 1][1] === con[i][1]) t++; const p = 100 * (1 - ((i + t) / 2) / (con.length - 1)); for (let q = i; q <= t; q++) { ac[con[q][0]][0] += p; ac[con[q][0]][1]++; } i = t + 1; } });
+      filas.forEach((x, i) => x.v.push(ac[i][1] ? ac[i][0] / ac[i][1] : null)); }
     filas.sort((a, b) => { const va = a.v[ki], vb = b.v[ki]; if (va == null) return 1; if (vb == null) return -1; return k.mejor === 'bajo' ? va - vb : vb - va; });
     filas.forEach((x, i) => x.pos = i + 1);
     const mio = filas.find(x => x.h === yo.h);
     const mioTodo = mio || (per.f.find(r => r[0] === yo.h) ? (r => ({ h: r[0], nom: r[1], ol: r[2], vj: r[3], v: r[4] }))(per.f.find(r => r[0] === yo.h)) : null);
     const e = mio ? estado(k, mio.v[ki]) : 'none';
     $('hero').innerHTML = mio
-      ? `<div class="lbl">${TROFEO}Mi posición · ${esc(k.nombre)}</div><div class="pos"><b>#${mio.pos}</b><span>de ${filas.length}</span></div><div class="meta"><b>${fmt(k, mio.v[ki])}</b> · ${TXT[e]}${k.meta != null ? ' (meta ' + fmt(k, k.meta) + ')' : ''} · ${mio.vj} viajes</div>`
+      ? `<div class="lbl">${TROFEO}Mi posición · ${esc(k.nombre)}</div><div class="pos"><b>#${mio.pos}</b><span>de ${filas.length}</span></div><div class="meta"><b>${fmt(k, mio.v[ki])}</b>${gen ? ' de puntaje (100 = el mejor en todo)' : ' · ' + TXT[e] + (k.meta != null ? ' (meta ' + fmt(k, k.meta) + ')' : '')} · ${mio.vj} viajes</div>`
       : `<div class="lbl">${TROFEO}Mi posición · ${esc(k.nombre)}</div><div class="pos"><b>—</b></div><div class="meta">${mioTodo ? 'Tenés ' + mioTodo.vj + ' viajes: el ranking pide al menos ' + per.min + ' en este período.' : 'No tenés viajes en este período.'}</div>`;
-    $('misK').innerHTML = mioTodo ? D.kpis.map((kk, j) => { const v = mioTodo.v[j], s = estado(kk, v); return `<div class="card k ${s}"><div class="n">${esc(kk.nombre)}</div><div class="v">${fmt(kk, v)}</div><div class="m ${s}">${txtE(kk, v, s)}</div></div>`; }).join('') : '<div class="empty" style="grid-column:1/-1">Sin datos tuyos en este período.</div>';
+    $('misK').innerHTML = mioTodo ? D.kpis.map((kk, j) => kk.oculto ? '' : (() => { const v = mioTodo.v[j], s = estado(kk, v); return `<div class="card k ${s}"><div class="n">${esc(kk.nombre)}</div><div class="v">${fmt(kk, v)}</div><div class="m ${s}">${txtE(kk, v, s)}</div></div>`; })()).join('') : '<div class="empty" style="grid-column:1/-1">Sin datos tuyos en este período.</div>';
     
-    $('lista').innerHTML = filas.length ? filas.map(x => { const s = estado(k, x.v[ki]); return `<div class="row${x.pos <= 3 ? ' top3' : ''}${x.h === yo.h ? ' yo' : ''}${st.abierto === x.h ? ' open' : ''}" data-h="${x.h}"><div class="p">${x.pos}</div><div class="nm"><b>${esc(x.nom)}</b><small>${esc(x.ol)} · ${x.vj} viajes</small></div><div class="val">${fmt(k, x.v[ki])}<i class="dot ${s}"></i></div><div class="det">${D.kpis.map((kk, j) => `<div><span>${esc(kk.nombre)}</span><b>${fmt(kk, x.v[j])}</b></div>`).join('')}</div></div>`; }).join('') : '<div class="empty">No hay choferes con el mínimo de viajes en este período.</div>';
+    $('lista').innerHTML = filas.length ? filas.map(x => { const s = estado(k, x.v[ki]); return `<div class="row${x.pos <= 3 ? ' top3' : ''}${x.h === yo.h ? ' yo' : ''}${st.abierto === x.h ? ' open' : ''}" data-h="${x.h}"><div class="p">${x.pos}</div><div class="nm"><b>${esc(x.nom)}</b><small>${esc(x.ol)} · ${x.vj} viajes</small></div><div class="val">${fmt(k, x.v[ki])}<i class="dot ${s}"></i></div><div class="det">${D.kpis.map((kk, j) => kk.oculto ? '' : `<div><span>${esc(kk.nombre)}</span><b>${fmt(kk, x.v[j])}</b></div>`).join('')}</div></div>`; }).join('') : '<div class="empty">No hay choferes con el mínimo de viajes en este período.</div>';
     document.querySelectorAll('#lista .row').forEach(r => r.onclick = () => { st.abierto = st.abierto === r.dataset.h ? '' : r.dataset.h; render(); });
     $('nota').textContent = 'Datos al ' + D.dataAl + ' · ' + filas.length + ' choferes en el ranking · Ranking con choferes de al menos ' + per.min + ' viajes en el período, igual que en el tablero.';
     const yoRow = document.querySelector('#lista .row.yo'); if (yoRow && !render.scrolled) { render.scrolled = true; }
   }
+  /* ---------- comentario del chofer: se envía por WhatsApp, mail o el link que configure el supervisor ---------- */
+  function llenarFb() { const ks = [{ id: 'general', nombre: 'Mi posición en el ranking' }].concat(D.kpis.filter(k => !k.oculto)); $('fbKpi').innerHTML = ks.map(k => `<option value="${k.id}">${esc(k.nombre)}</option>`).join(''); $('fbKpi').value = st.k === 'general' || D.kpis.some(k => k.id === st.k) ? st.k : 'general'; }
+  function textoFb() {
+    const per = D.periodos.find(p => p.id === st.p && p.tipo === st.t), id = $('fbKpi').value, ki = D.kpis.findIndex(k => k.id === id), k = D.kpis[ki];
+    const fila = per && per.f.find(r => r[0] === yo.h);
+    const pos = (document.querySelector('#lista .row.yo .p') || {}).textContent;
+    const det = k ? k.nombre + ': ' + (fila ? fmt(k, fila[4][ki]) : '—') + (k.meta != null ? ' (meta ' + fmt(k, k.meta) + ')' : '') : 'Posición en el ranking' + (pos ? ' #' + pos + ' (' + $('selKpi').selectedOptions[0].textContent + ')' : '');
+    return 'Comentario de ' + (yo.nombre || 'chofer') + ' (DNI ' + yo.d + ')' + (yo.ol ? ' · ' + yo.ol : '') + '\nPeríodo: ' + (per ? per.label : '') + '\n' + det + '\n\n' + $('fbTxt').value.trim();
+  }
+  /* Valores sueltos para el formulario de Microsoft Forms con respuestas pre-rellenadas (marcadores XNOMBREX, XDNIX, etc.) */
+  function camposFb() {
+    const per = D.periodos.find(p => p.id === st.p && p.tipo === st.t), id = $('fbKpi').value, ki = D.kpis.findIndex(k => k.id === id), k = D.kpis[ki];
+    const fila = per && per.f.find(r => r[0] === yo.h);
+    const pos = (document.querySelector('#lista .row.yo .p') || {}).textContent || '';
+    return { NOMBRE: yo.nombre || '', DNI: yo.d, OL: yo.ol || '', PERIODO: per ? per.label : '', INDICADOR: k ? k.nombre : 'Posición en el ranking',
+      VALOR: k ? (fila ? fmt(k, fila[4][ki]) : '—') : (pos ? '#' + pos : '—'), META: k && k.meta != null ? fmt(k, k.meta) : '',
+      POSICION: pos ? '#' + pos + ' (' + $('selKpi').selectedOptions[0].textContent + ')' : '', COMENTARIO: $('fbTxt').value.trim() };
+  }
+  $('fbEnv').onclick = async () => {
+    const t = $('fbTxt').value.trim(); $('fbOk').textContent = '';
+    if (t.length < 3) { $('fbOk').style.color = 'var(--bad)'; $('fbOk').textContent = 'Escribí tu comentario.'; return; }
+    $('fbOk').style.color = '';
+    const msj = textoFb(), dst = String(D.coment || '').trim();
+    if (/^https?:\/\//i.test(dst)) {
+      if (/X(NOMBRE|DNI|OL|PERIODO|INDICADOR|VALOR|META|POSICION|COMENTARIO)X/.test(dst)) {
+        const c = camposFb(); let url = dst;
+        for (const [n, v] of Object.entries(c)) url = url.split('X' + n + 'X').join(encodeURIComponent(String(v).replace(/"/g, "'").replace(/[\r\n]+/g, ' ')));
+        window.open(url, '_blank'); $('fbOk').textContent = 'Se abrió el formulario con tus datos y tu comentario cargados. Revisalo y tocá Enviar.'; return;
+      }
+      try { await navigator.clipboard.writeText(msj); } catch (e) {} window.open(dst, '_blank'); $('fbOk').textContent = 'Se abrió el formulario. Tu comentario quedó copiado: pegalo ahí.'; return; }
+    if (/@/.test(dst)) { location.href = 'mailto:' + dst + '?subject=' + encodeURIComponent('Comentario ranking · ' + (yo.nombre || '')) + '&body=' + encodeURIComponent(msj); $('fbOk').textContent = 'Se abrió tu correo con el comentario listo para enviar.'; return; }
+    const tel = dst.replace(/\D/g, '');
+    if (tel.length >= 8) { window.open('https://wa.me/' + tel + '?text=' + encodeURIComponent(msj), '_blank'); $('fbOk').textContent = 'Se abrió WhatsApp con tu comentario. Tocá enviar.'; return; }
+    if (navigator.share) { try { await navigator.share({ text: msj }); $('fbOk').textContent = 'Elegí a quién mandárselo.'; } catch (e) {} return; }
+    try { await navigator.clipboard.writeText(msj); $('fbOk').textContent = 'Tu comentario quedó copiado. Pegalo en el chat con tu supervisor.'; } catch (e) { $('fbOk').textContent = 'Copiá tu comentario y mandáselo a tu supervisor.'; }
+  };
   cargar();
 })();
 </script>
