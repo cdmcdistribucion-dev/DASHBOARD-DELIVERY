@@ -206,7 +206,7 @@ html{scroll-behavior:smooth}
 <header class="topbar">
   <div class="brand">
     <h1>DASHBOARD DISTRI</h1>
-    <small>KPIs de choferes y operadores logísticos · versión 2026-10-28 14:20</small>
+    <small>KPIs de choferes y operadores logísticos · versión 2026-10-29 11:20</small>
   </div>
   <div class="fresh">
     <span id="freshText"><span class="dot off"></span>Sin datos cargados</span>
@@ -1759,13 +1759,13 @@ const planGrupo = new Map();
      Como el Excel: clave planilla + cliente; Refacturó = columna "Hubo refacturación" (o "Refacturado") de Chat Tonic (si no está: NO);
      chofer y OL = SALIDA por planilla (con la fecha, ±3 días). Una visita = planilla + cliente + día. */
   D.refac = { visitas: 0, refac: 0, sinChat: 0, chatSinVisita: 0, sinChofer: 0, falta: '', listaChat: [], listaSinSal: [] };
-  const refacDet = [];
+  const refacDet = [], refacNoDet = [];
   { const R3 = raw.EXTRA['3308'], RC = raw.EXTRA['CHAT'];
     if (!R3 || !R3.length) D.refac.falta = 'Falta la bajada 3 30 8 en la carpeta (el nombre del archivo tiene que decir 3308 o 3 30 8)';
     else if (!RC || !RC.length) D.refac.falta = 'Falta la bajada de Chat Tonic en la carpeta (el nombre del archivo tiene que decir Chat Tonic)';
     else {
       const e3 = raw.EXTRA_ENC['3308'] || new Set(), ec = raw.EXTRA_ENC['CHAT'] || new Set(), rc3 = n => resolverCol(n, e3), rcc = n => resolverCol(n, ec);
-      const c3 = { p: rc3('Planilla'), c: rc3('Client') || rc3('Cliente'), fe: rc3('Entrega'), fp: rc3('F.Pedido') || rc3('Fecha Pedido') || rc3('FPedido') || ((raw.EXTRA_ORD && raw.EXTRA_ORD['3308'] || [])[0] || null), hl: rc3('Hecto Litr') || rc3('Hectolitros'), imp: rc3('Importe Total') };
+      const c3 = { p: rc3('Planilla'), c: rc3('Client') || rc3('Cliente'), fe: rc3('Entrega'), fp: rc3('F.Pedido') || rc3('Fecha Pedido') || rc3('FPedido') || ((raw.EXTRA_ORD && raw.EXTRA_ORD['3308'] || [])[0] || null), hl: rc3('Hecto Litr') || rc3('Hectolitros'), imp: rc3('Importe Total'), mt: rc3('Motivo Truck') };
       const cc = { p: rcc('Nro de Planilla'), c: rcc('Nro de Cliente'), f: rcc('Timestamp inicio'), ref: rcc('Refacturado') || rcc('Hubo refacturación') || rcc('Hubo refacturacion'), mot: rcc('Motivo de refacturación') || rcc('Motivo de refacturacion'), monto: rcc('Monto refacturación ajustado'), monto2: rcc('Monto refacturación'), hubo: rcc('Hubo refacturación'), ol: rcc('Operador logístico') || rcc('Operador logistico') };
       D.refac.cols = { '3308': c3, chat: cc };
       const faltan = [!c3.p && '3 30 8: Planilla', !c3.c && '3 30 8: Client', !cc.p && 'Chat Tonic: Nro de Planilla', !cc.c && 'Chat Tonic: Nro de Cliente', !cc.ref && 'Chat Tonic: Hubo refacturación'].filter(Boolean);
@@ -1782,7 +1782,7 @@ const planGrupo = new Map();
         for (const r of R3) { const p = llaveP(r[c3.p]), c = cliN(r[c3.c]); if (!p || !c) { R.sinPC3++; continue; }
           const f = (c3.fp && fT(r[c3.fp])) || (c3.fe && fT(r[c3.fe])) || ''; if (!f) { R.sinF3++; continue; }   /* fecha del % = F.Pedido (columna A); si viene vacía, Entrega */
           pcU.add(p + '|' + c);
-          const k = f + '|' + p + '|' + c; const v = vis.get(k) || { f, p, c, hl: 0, imp: 0 }; v.hl += c3.hl ? num(r[c3.hl]) : 0; v.imp += c3.imp ? num(r[c3.imp]) : 0; vis.set(k, v); }
+          const k = f + '|' + p + '|' + c; const v = vis.get(k) || { f, p, c, hl: 0, imp: 0, mt: c3.mt ? String(r[c3.mt] == null ? '' : r[c3.mt]).trim() : '' }; v.hl += c3.hl ? num(r[c3.hl]) : 0; v.imp += c3.imp ? num(r[c3.imp]) : 0; vis.set(k, v); }
         R.pcUnicos = pcU.size;
         const dias = (a, b) => (a && b) ? Math.abs((Date.parse(a) - Date.parse(b)) / 864e5) : 0;
         for (const v of vis.values()) {
@@ -1805,6 +1805,7 @@ const planGrupo = new Map();
           if (oculto) { const kh = 'FH|' + v.f + '|' + canal; g = grupos.get(kh); if (!g) { g = base(v.f, '', OL_OCULTO, canal); g.olOrig = 'Refacturaciones sin chofer u OL propio'; grupos.set(kh, g); } }
           else { const o = mapOL(ol), kf = 'F|' + v.f + '|' + dni + '|' + o.ol + '|' + o.orig + '|' + canal; g = grupos.get(kf); if (!g) { g = base(v.f, dni, o.ol, canal); g.olOrig = o.orig; grupos.set(kf, g); } }
           g.refD++; if (ref) { g.refN++; D.refac.refac++; }
+          if (!ref) refacNoDet.push([v.f, v.p, v.c, oculto ? OL_OCULTO : mapOL(ol).ol, canal, oculto ? '' : dni, Math.round(v.hl * 1000) / 1000, Math.round(v.imp * 100) / 100, v.mt || '', ch ? 'Está en Chat Tonic sin refacturación' : 'No está en Chat Tonic']);
           if (ref) refacDet.push([v.f, v.p, v.c, oculto ? OL_OCULTO : mapOL(ol).ol, canal, oculto ? '' : dni, ch.mot || 'Sin motivo', Math.round(v.hl * 1000) / 1000, Math.round(v.imp * 100) / 100, Math.round((ch.monto || 0) * 100) / 100]);
         }
         /* Refacturaciones de Chat Tonic que no se encontraron en la 3 30 8, con el motivo probable */
@@ -2061,7 +2062,7 @@ const planGrupo = new Map();
     detalle: rch.map(x => [x.f, x.planilla, x.cliente, mapOL(x.ol).ol === AGUANOR ? OL_OCULTO : mapOL(x.ol).ol, x.canal, x.S, x.V, x.X, x.pedRch, x.mod || '-', x.modTot, x.modEnt, x.modEntORch, x.hlRch, x.motRch, mapOL(x.ol).ol === AGUANOR ? '' : x.dni, x.conRch, x.chofer || '', x.olNO ? mapOL(x.olNO).ol : '', x.hlVta, x.olNOf || '', x.ped, mapOL(x.ol).ol === AGUANOR ? 1 : 0, x.olOfi ? (x.olOfi === OL_OCULTO ? OL_OCULTO : mapOL(x.olOfi).ol) : 'Aguanor', x.olOfiF, x.cand || null]),
     modoMod: CONFIG.modoMod,
     ajustes: { claveFiltro: CONFIG.claveFiltro, filtroInicial: CONFIG.filtroInicial },
-    refacDet,
+    refacDet, refacNoDet,
     modoViajes: CONFIG.modoViajes, olOculto: OL_OCULTO, olNoListar: [OL_OCULTO, SINPLAN, 'Sin OL'],
     filas, choferes, ols, kpis, campos: CAMPOS_NUCLEO.concat(camposExtra), config: raw.config,
     lectura: { fecha: new Date().toISOString(), archivos },
@@ -2660,16 +2661,18 @@ function renderRefac() {
   const fil = filtrar(r);
   const tot = sumar(fil);
   const det = (DATA.refacDet || []).filter(x => x[0] >= r.desde && x[0] <= r.hasta && (!S.ol || x[3] === S.ol) && (!S.canal || x[4] === S.canal) && (!dni || x[5] === dni));
+  const detNo = (DATA.refacNoDet || []).filter(x => x[0] >= r.desde && x[0] <= r.hasta && (!S.ol || x[3] === S.ol) && (!S.canal || x[4] === S.canal) && (!dni || x[5] === dni));
   const p2 = (a, b) => b ? (100 * a / b).toFixed(2).replace('.', ',') + '%' : '—';
   const monto = det.reduce((a, x) => a + (x[9] || 0), 0);
   $('refSub').textContent = '';
   $('refRes').innerHTML = `<div class="minis" style="margin-bottom:10px"><div class="mini"><span>% refacturación</span><b>${p2(tot.refN, tot.refD)}</b>${k && k.meta != null ? ` <small>meta ${p2(k.meta, 1)}</small>` : ''}</div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="btnExpRef">⬇ Descargar refacturaciones (${nf0.format(det.length)})</button></div>
-    <p class="sub" style="margin:8px 0 0;white-space:normal">Control (todas las fechas): 3 30 8: ${nf0.format(D.filas3 || 0)} filas (una por producto)${D.sinPC3 ? ' · ' + nf0.format(D.sinPC3) + ' sin planilla o cliente (no se cuentan)' : ''}${D.sinF3 ? ' · ' + nf0.format(D.sinF3) + ' sin fecha (no se cuentan)' : ''} · ${nf0.format(D.pcUnicos || 0)} planilla + cliente distintos · ${nf0.format(D.visitas)} visitas (planilla + cliente + fecha de pedido) · ${nf0.format(D.refac)} refacturadas · ${nf0.format(D.sinChat)} sin registro en Chat Tonic (cuentan como NO) · ${nf0.format(D.sinChofer)} clientes con la planilla fuera de SALIDA (${nf0.format(D.planSinSal || 0)} planillas; suman al total, sin chofer) · ${nf0.format(D.chatSinVisita)} refacturaciones de Chat Tonic que no se encontraron en la 3 30 8.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn" id="btnRefSinSal">⬇ Planillas que no están en SALIDA (${nf0.format(D.planSinSal || 0)})</button><button class="btn" id="btnRefChatSin">⬇ Refacturaciones de Chat Tonic no encontradas en la 3 30 8 (${nf0.format(D.chatSinVisita)})</button></div>`;
+    <p class="sub" style="margin:8px 0 0;white-space:normal">Control (todas las fechas): 3 30 8: ${nf0.format(D.filas3 || 0)} filas (una por producto)${D.sinPC3 ? ' · ' + nf0.format(D.sinPC3) + ' sin planilla o cliente (no se cuentan)' : ''}${D.sinF3 ? ' · ' + nf0.format(D.sinF3) + ' sin fecha (no se cuentan)' : ''} · ${nf0.format(D.pcUnicos || 0)} planilla + cliente distintos · ${nf0.format(D.visitas)} visitas (planilla + cliente + fecha de pedido) · ${nf0.format(D.refac)} refacturadas · ${nf0.format(D.sinChat)} sin registro en Chat Tonic (cuentan como NO) · ${nf0.format(D.sinChofer)} clientes con la planilla fuera de SALIDA (${nf0.format(D.planSinSal || 0)} planillas; suman al total, sin chofer).</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn" id="btnRefSinSal">⬇ Planillas que no están en SALIDA (${nf0.format(D.planSinSal || 0)})</button><button class="btn" id="btnRefNoChat">⬇ Refacturaciones que no se hicieron por Chat Tonic (${nf0.format(detNo.length)})</button></div>`;
   const fl = f => f ? f.split('-').reverse().join('/') : '';
   $('btnRefSinSal').onclick = () => descargarCSV('refac_planillas_sin_salida.csv', [['Fecha de pedido (3 30 8)', 'Planilla', 'Cliente', 'Refacturado']].concat((D.listaSinSal || []).slice().sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : String(a[1]).localeCompare(String(b[1]))).map(x => [fl(x[0]), x[1], x[2], x[3]])));
-  $('btnRefChatSin').onclick = () => descargarCSV('refac_chat_tonic_sin_3308.csv', [['Fecha (Chat Tonic)', 'Nro de Planilla', 'Nro de Cliente', 'Operador logístico (Chat Tonic)', 'Motivo de refacturación', 'Monto refacturación', 'Por qué no se encontró']].concat((D.listaChat || []).slice().sort((a, b) => a[0] < b[0] ? -1 : 1).map(x => [fl(x[0]), x[1], x[2], x[3], x[4], x[5], x[6]])));
+  $('btnRefNoChat').onclick = () => descargarCSV('refacturaciones_sin_chat_tonic_' + r.desde + '_al_' + r.hasta + '.csv', [['Fecha de pedido', 'Planilla', 'Cliente', 'Operador logístico', 'Canal', 'Chofer', 'DNI', 'HL', 'Importe total', 'Motivo Truck (3 30 8)', 'Chat Tonic']]
+    .concat(detNo.slice().sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : String(a[1]).localeCompare(String(b[1]))).map(x => [fl(x[0]), x[1], x[2], x[3] === DATA.olOculto ? 'Sin chofer u OL propio' : x[3], x[4], x[5] ? nombreChofer(x[5]) : '', x[5] || '', x[6], x[7], x[8], x[9]])));
   $('btnExpRef').onclick = () => descargarCSV('refacturaciones_' + r.desde + '_al_' + r.hasta + '.csv', [['Fecha de pedido', 'Planilla', 'Cliente', 'Operador logístico', 'Canal', 'Chofer', 'DNI', 'Motivo de refacturación', 'HL', 'Importe total', 'Monto refacturación']]
     .concat(det.slice().sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0).map(x => [fLarga(x[0]), x[1], x[2], x[3] === DATA.olOculto ? 'Sin chofer / otros' : x[3], x[4], x[5] ? nombreChofer(x[5]) : '', x[5] || '', x[6], x[7], x[8], x[9]])));
   /* motivos */
@@ -2679,11 +2682,11 @@ function renderRefac() {
   /* por OL */
   const go = agrupar(fil.filter(x => x.refD), x => x.ol); noListar(go);
   const ro = [...go.entries()].map(([ol, rs]) => { const s = sumar(rs); return { ol, d: s.refD, n: s.refN }; }).sort((a, b) => a.ol.localeCompare(b.ol, 'es'));
-  $('tblRefOL').innerHTML = `<thead><tr><th class="l">OL</th><th>Clientes atendidos</th><th>Refacturados</th><th>% refacturación</th></tr></thead><tbody>${ro.map(x => `<tr><td class="l"><b>${esc(x.ol)}</b></td><td class="num">${nf0.format(x.d)}</td><td class="num">${nf0.format(x.n)}</td><td class="num"><b>${p2(x.n, x.d)}</b></td></tr>`).join('')}<tr class="total"><td class="l"><b>Total</b></td><td class="num">${nf0.format(tot.refD)}</td><td class="num">${nf0.format(tot.refN)}</td><td class="num"><b>${p2(tot.refN, tot.refD)}</b></td></tr></tbody>`;
+  $('tblRefOL').innerHTML = `<thead><tr><th class="l">OL</th><th>Clientes refacturados</th><th>Refacturados por Chat Tonic</th><th>% refacturación</th></tr></thead><tbody>${ro.map(x => `<tr><td class="l"><b>${esc(x.ol)}</b></td><td class="num">${nf0.format(x.d)}</td><td class="num">${nf0.format(x.n)}</td><td class="num"><b>${p2(x.n, x.d)}</b></td></tr>`).join('')}<tr class="total"><td class="l"><b>Total</b></td><td class="num">${nf0.format(tot.refD)}</td><td class="num">${nf0.format(tot.refN)}</td><td class="num"><b>${p2(tot.refN, tot.refD)}</b></td></tr></tbody>`;
   /* por chofer */
   const gc = agrupar(fil.filter(x => x.dni && x.refD), x => x.dni);
   const rc = [...gc.entries()].map(([d, rs]) => { const s = sumar(rs); const mots = agrupar(det.filter(x => x[5] === d), x => x[6]); const top = [...mots.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 2).map(([m, l]) => m + ' (' + l.length + ')').join(' · '); return { d, nombre: nombreChofer(d), ol: (DATA.choferes[d] || {}).ol || rs[0].ol, cl: s.refD, n: s.refN, top }; }).filter(x => x.n > 0).sort((a, b) => b.n - a.n || b.n / b.cl - a.n / a.cl);
-  $('tblRefCh').innerHTML = `<thead><tr><th class="l">Chofer</th><th class="l">OL</th><th>Clientes atendidos</th><th>Refacturados</th><th>% refacturación</th><th class="l">Motivos principales</th></tr></thead><tbody>${rc.map(x => `<tr data-dni="${esc(x.d)}" style="cursor:pointer"><td class="l"><b>${esc(x.nombre)}</b></td><td class="l">${esc(x.ol)}</td><td class="num">${nf0.format(x.cl)}</td><td class="num">${nf0.format(x.n)}</td><td class="num"><b>${p2(x.n, x.cl)}</b></td><td class="l" style="white-space:normal">${esc(x.top)}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Ningún chofer refacturó en el período.</td></tr>'}</tbody>`;
+  $('tblRefCh').innerHTML = `<thead><tr><th class="l">Chofer</th><th class="l">OL</th><th>Clientes refacturados</th><th>Refacturados por Chat Tonic</th><th>% refacturación</th><th class="l">Motivos principales</th></tr></thead><tbody>${rc.map(x => `<tr data-dni="${esc(x.d)}" style="cursor:pointer"><td class="l"><b>${esc(x.nombre)}</b></td><td class="l">${esc(x.ol)}</td><td class="num">${nf0.format(x.cl)}</td><td class="num">${nf0.format(x.n)}</td><td class="num"><b>${p2(x.n, x.cl)}</b></td><td class="l" style="white-space:normal">${esc(x.top)}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Ningún chofer refacturó en el período.</td></tr>'}</tbody>`;
   document.querySelectorAll('#tblRefCh tr[data-dni]').forEach(tr => tr.onclick = () => abrirChofer(tr.dataset.dni));
 }
 
@@ -2854,7 +2857,7 @@ function iniciarVistas(datos) {
    - Si el navegador no permite recordar carpetas, usa el selector clásico.
    ===================================================================== */
 (function () {
-  const VERSION_TABLERO = '2026-10-28 14:20';
+  const VERSION_TABLERO = '2026-10-29 11:20';
   const g = id => document.getElementById(id);
   function mensaje(t, error) { const m = g('msg'); m.textContent = t; m.className = error ? 'err' : ''; }
   const hora = d => d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
