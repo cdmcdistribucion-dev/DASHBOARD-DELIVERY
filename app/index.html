@@ -140,6 +140,7 @@ h1{margin:6px 0 4px;font-size:30px;line-height:1.15;color:var(--tx)}
       <textarea id="fbTxt" maxlength="600" placeholder="Ej.: el cliente estaba cerrado y por eso el rechazo…"></textarea>
       <button class="btn" id="fbEnv" type="button">Enviar comentario</button>
       <div class="ok" id="fbOk"></div>
+      <div class="nota" id="fbDst" style="margin-top:4px"></div>
     </div>
     <div class="sect"><span class="eti">Mis indicadores</span></div>
     <div class="grid" id="misK"></div>
@@ -237,7 +238,9 @@ h1{margin:6px 0 4px;font-size:30px;line-height:1.15;color:var(--tx)}
     const yoRow = document.querySelector('#lista .row.yo'); if (yoRow && !render.scrolled) { render.scrolled = true; }
   }
   /* ---------- comentario del chofer: se envía por WhatsApp, mail o el link que configure el supervisor ---------- */
-  function llenarFb() { const ks = [{ id: 'general', nombre: 'Mi posición en el ranking' }].concat(D.kpis.filter(k => !k.oculto)); $('fbKpi').innerHTML = ks.map(k => `<option value="${k.id}">${esc(k.nombre)}</option>`).join(''); $('fbKpi').value = st.k === 'general' || D.kpis.some(k => k.id === st.k) ? st.k : 'general'; }
+  function destinoFb() { const d = String(D.coment || ''); return /^https?:/i.test(d) ? 'Se envía al formulario de comentarios.' : /@/.test(d) ? 'Se envía por mail a tu supervisor.' : d.replace(/\D/g, '').length >= 8 ? 'Se envía por WhatsApp a tu supervisor.' : 'Todavía no hay un destino configurado: se comparte desde tu celular.'; }
+  function llenarFb() { $('fbDst').textContent = destinoFb();
+    const ks = [{ id: 'general', nombre: 'Mi posición en el ranking' }].concat(D.kpis.filter(k => !k.oculto)); $('fbKpi').innerHTML = ks.map(k => `<option value="${k.id}">${esc(k.nombre)}</option>`).join(''); $('fbKpi').value = st.k === 'general' || D.kpis.some(k => k.id === st.k) ? st.k : 'general'; }
   function textoFb() {
     const per = D.periodos.find(p => p.id === st.p && p.tipo === st.t), id = $('fbKpi').value, ki = D.kpis.findIndex(k => k.id === id), k = D.kpis[ki];
     const fila = per && per.f.find(r => r[0] === yo.h);
@@ -250,7 +253,7 @@ h1{margin:6px 0 4px;font-size:30px;line-height:1.15;color:var(--tx)}
     const per = D.periodos.find(p => p.id === st.p && p.tipo === st.t), id = $('fbKpi').value, ki = D.kpis.findIndex(k => k.id === id), k = D.kpis[ki];
     const fila = per && per.f.find(r => r[0] === yo.h);
     const pos = (document.querySelector('#lista .row.yo .p') || {}).textContent || '';
-    return { NOMBRE: yo.nombre || '', DNI: yo.d, OL: yo.ol || '', PERIODO: per ? per.label : '', INDICADOR: k ? k.nombre : 'Posición en el ranking',
+    return { NOMBRE: yo.nombre || '', DNI: yo.d, OL: yo.ol || '', PERIODO: per ? per.label : '', FECHA: per ? per.label : '', INDICADOR: k ? k.nombre : 'Posición en el ranking',
       VALOR: k ? (fila ? fmt(k, fila[4][ki]) : '—') : (pos ? '#' + pos : '—'), META: k && k.meta != null ? fmt(k, k.meta) : '',
       POSICION: pos ? '#' + pos + ' (' + $('selKpi').selectedOptions[0].textContent + ')' : '', COMENTARIO: $('fbTxt').value.trim() };
   }
@@ -260,7 +263,7 @@ h1{margin:6px 0 4px;font-size:30px;line-height:1.15;color:var(--tx)}
     $('fbOk').style.color = '';
     const msj = textoFb(), dst = String(D.coment || '').trim();
     if (/^https?:\/\//i.test(dst)) {
-      if (/X(NOMBRE|DNI|OL|PERIODO|INDICADOR|VALOR|META|POSICION|COMENTARIO)X/.test(dst)) {
+      if (/X(NOMBRE|DNI|OL|PERIODO|FECHA|INDICADOR|VALOR|META|POSICION|COMENTARIO)X/.test(dst)) {
         const c = camposFb(); let url = dst;
         for (const [n, v] of Object.entries(c)) url = url.split('X' + n + 'X').join(encodeURIComponent(String(v).replace(/"/g, "'").replace(/[\r\n]+/g, ' ')));
         window.open(url, '_blank'); $('fbOk').textContent = 'Se abrió el formulario con tus datos y tu comentario cargados. Revisalo y tocá Enviar.'; return;
