@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Campeonato de OL</title>
+<style>
+:root{--neg:#000;--ama:#f5b800;--fondo:#f2f2f3;--txt:#2b2b2e;--tit:#111;--gris:#6f6f76;--gris2:#5f5f66;--linea:#ececef;--verde:#1f7a35;--okF:#f1faf4;--okT:#17663a;--malF:#fdf3f3;--malT:#a32626;--topF:#fff3c4;--topT:#7a5a00}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fondo);font-family:Arial,Helvetica,sans-serif;color:var(--txt)}
+header{background:var(--neg);border-bottom:4px solid var(--ama);padding:14px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px}
+header .marca{display:flex;align-items:center;gap:14px}
+header b{color:#fff;font-size:19px;display:block}
+header small{color:var(--ama);font-size:13px}
+header .al{color:#cfcfd4;font-size:13px}
+main{padding:26px 32px 40px;display:flex;flex-direction:column;gap:20px;max-width:1600px;margin:0 auto}
+.kick{color:var(--verde);font-size:12px;font-weight:700;letter-spacing:.22em}
+h1{margin:0;font-size:30px;line-height:1.15;color:var(--tit)}
+h2{margin:0;font-size:24px;color:var(--tit)}
+.sub{margin:0;color:var(--gris2);font-size:15px}
+.fila{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.col{display:flex;flex-direction:column;gap:4px}
+.ctrl{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.seg{display:flex;background:#e6e6e9;border-radius:12px;padding:4px;width:260px}
+.seg button{flex:1;border:0;border-radius:9px;padding:10px 6px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;background:transparent;color:var(--gris2)}
+.seg button[aria-pressed="true"]{background:#fff;color:var(--tit);box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.selbox{background:#fff;border:1px solid #dcdce0;border-radius:12px;padding:6px 12px;display:flex;flex-direction:column}
+.selbox label{font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--gris)}
+.selbox select{border:0;background:transparent;font-weight:700;font-size:15px;color:var(--tit);padding:2px 0;min-width:240px;font-family:inherit}
+.btn{background:var(--neg);color:#fff;border:2px solid var(--ama);border-radius:10px;padding:12px 16px;font-weight:700;font-size:14px;font-family:inherit;display:flex;align-items:center;gap:8px;cursor:pointer}
+.podio{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+.card{background:#fff;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.07)}
+.pc{padding:18px;display:flex;flex-direction:column;gap:8px;border:2px solid transparent}
+.pc .pos{font-weight:700;font-size:15px;color:var(--gris)}
+.pc .ol{font-size:19px;color:var(--tit);font-weight:700}
+.pc .pts{font-size:38px;line-height:1;color:var(--tit);font-weight:700}
+.pc .max{font-size:13px;color:var(--gris)}
+.pc .bf{height:6px;border-radius:99px;background:var(--linea)}
+.pc .bb{height:6px;border-radius:99px;background:var(--verde)}
+.pc.g1{background:var(--neg);border-color:var(--ama)}
+.pc.g1 .pos,.pc.g1 .pts,.pc .etq{color:var(--ama)}
+.pc .etq{font-size:11px;font-weight:700;letter-spacing:.06em}
+.pc.g1 .ol{color:#fff}.pc.g1 .max{color:#cfcfd4}.pc.g1 .bf{background:#2b2b2e}.pc.g1 .bb{background:var(--ama)}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{background:#fafafb;padding:10px 8px;text-align:center;border-left:1px solid var(--linea);font-size:12px;color:var(--tit)}
+th.l{text-align:left;border-left:0;font-size:11px;letter-spacing:.06em;color:var(--gris)}
+th .m{font-size:11px;color:var(--verde);font-weight:700;margin-top:3px}
+th .w{font-size:10px;color:var(--gris);font-weight:400;margin-top:3px}
+td{border-top:1px solid var(--linea);padding:14px 8px;text-align:center;border-left:1px solid var(--linea)}
+td.l{text-align:left;border-left:0}
+td.l b{color:var(--tit);font-size:15px}
+td.l small{display:block;font-size:12px;color:var(--gris);margin-top:3px}
+.np{display:inline-block;width:30px;padding:5px 0;border-radius:8px;text-align:center;font-weight:700;background:var(--linea);color:var(--gris2)}
+.np.p1{background:var(--ama);color:#000}.np.p2,.np.p3{background:#000;color:#fff}
+td.ok{background:var(--okF)}td.mal{background:var(--malF)}td.top{background:var(--topF)}td.sd{background:#fafafb}
+td .v{font-weight:700;font-size:15px}
+td.ok .v,td.top .v{color:var(--okT)}td.mal .v{color:var(--malT)}td.sd .v{color:var(--gris)}
+td .p{font-size:11px;margin-top:3px}
+td.ok .p{color:var(--okT)}td.mal .p{color:var(--malT)}td.top .p{color:var(--topT);font-weight:700}td.sd .p{color:var(--gris)}
+.tot{background:#000;color:var(--ama);font-weight:700;font-size:18px;padding:6px 14px;border-radius:999px;white-space:nowrap}
+.wk{font-weight:700}
+.nota{margin:0;padding:12px 16px;border-top:1px solid var(--linea);font-size:12px;color:var(--gris2)}
+.ley{display:flex;gap:22px;font-size:13px;color:var(--gris2);padding:0 4px;flex-wrap:wrap}
+.ley span{display:flex;align-items:center;gap:8px}
+.ley i{width:14px;height:14px;border-radius:4px;display:inline-block}
+.graf{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.gc{padding:18px;display:flex;flex-direction:column;gap:14px}
+.gc .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.gc .hd b{font-size:16px;color:var(--tit)}
+.gc .hd span{font-size:12px;font-weight:700;color:var(--verde);white-space:nowrap}
+.br{display:grid;grid-template-columns:140px minmax(0,1fr) 66px;gap:10px;align-items:center}
+.br .n{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.br .t{position:relative;height:22px;background:var(--fondo);border-radius:6px}
+.br .b{position:absolute;left:0;top:0;bottom:0;border-radius:6px}
+.br .mt{position:absolute;top:-4px;bottom:-4px;border-left:2px dashed #111}
+.br .x{text-align:right;font-size:13px;font-weight:700}
+.gc .pie{display:flex;justify-content:space-between;font-size:12px;color:var(--gris);border-top:1px solid #f0f0f2;padding-top:10px}
+.vacio{padding:30px;text-align:center;color:var(--gris2)}
+@media (max-width:1100px){.graf{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:700px){main{padding:16px}header{padding:12px 16px}.graf{grid-template-columns:1fr}}
+</style>
+<script src="datos_campeonato.js"></script>
+</head>
+<body>
+<header>
+  <div class="marca">
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#f5b800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"></path><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"></path></svg>
+    <div><b>Campeonato de Operadores Logísticos</b><small>CD Mercado Central · Distribución</small></div>
+  </div>
+  <span class="al" id="al"></span>
+</header>
+<main id="main">
+  <div class="fila">
+    <div class="col">
+      <span class="kick">TABLA DE POSICIONES</span>
+      <h1 id="tit"></h1>
+      <p class="sub" id="subt"></p>
+    </div>
+    <div class="ctrl">
+      <div class="seg" role="group" aria-label="Vista">
+        <button type="button" id="bSem" aria-pressed="true">Semanal</button>
+        <button type="button" id="bMes" aria-pressed="false">Mensual</button>
+      </div>
+      <div class="selbox"><label for="sel" id="selLbl">SEMANA</label><select id="sel"></select></div>
+      <button type="button" class="btn" id="bDesc">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f5b800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"></path></svg>
+        Descargar Excel
+      </button>
+    </div>
+  </div>
+  <div class="podio" id="podio"></div>
+  <div class="card tw" id="tabla"></div>
+  <div class="ley">
+    <span><i style="background:#fff3c4;border:1px solid #f5b800"></i>Mejor OL del KPI · +5 puntos</span>
+    <span><i style="background:#e1f4e8;border:1px solid #9fd3b1"></i>En meta · +3 puntos</span>
+    <span><i style="background:#fbe3e3;border:1px solid #e7a9a9"></i>Fuera de meta · 0 puntos</span>
+  </div>
+  <div class="fila" style="margin-top:14px">
+    <div class="col">
+      <span class="kick">PARETO POR KPI</span>
+      <h2>Cada KPI separado por operador</h2>
+      <p class="sub" id="parSub"></p>
+    </div>
+    <div class="ley">
+      <span><i style="background:#1f9a4a"></i>En meta</span>
+      <span><i style="background:#d64545"></i>Fuera de meta</span>
+      <span><i style="width:0;border-left:2px dashed #111;border-radius:0"></i>Meta</span>
+    </div>
+  </div>
+  <div class="graf" id="graf"></div>
+</main>
+<script>
+(function () {
+  var D = window.CAMP_DATOS;
+  var $ = function (id) { return document.getElementById(id); };
+  if (!D || !D.semanas || !D.semanas.length) { $('main').innerHTML = '<div class="card vacio">Todavía no hay datos del campeonato. Se cargan al publicar el tablero.</div>'; return; }
+  var K = D.kpis, OLS = D.ols;
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var nf = function (v, d) { return v.toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d }); };
+  var fmt = function (k, v) { if (v == null) return '—'; return k.fmt === 'pct' ? nf(v * 100, k.dec === 2 ? 2 : k.dec === 0 ? 0 : 1) + '%' : nf(v, 2); };
+  var metaTxt = function (k, m) { return m == null ? 'sin meta' : (k.mejor === 'bajo' ? '≤ ' : '≥ ') + fmt(k, m); };
+  var cumple = function (k, v, m) { return v != null && m != null && (k.mejor === 'bajo' ? v <= m : v >= m); };
+  var st = { vista: 'semana', sem: D.semanas[D.semanas.length - 1].id, mes: D.meses.length ? D.meses[D.meses.length - 1].id : '' };
+
+  /* puntos de una semana: en meta 3, el mejor OL del KPI (si está en meta) 5; empatados en el mejor, 5 cada uno */
+  function puntosSemana(w) {
+    var r = {};
+    OLS.forEach(function (o) { r[o] = { ol: o, pts: 0, mejores: 0, metas: 0, conDato: false, k: [] }; });
+    K.forEach(function (k, i) {
+      var m = w.metas[i], vs = OLS.map(function (o) { return w.v[o] ? w.v[o][i] : null; }).filter(function (v) { return v != null; });
+      var mejor = vs.length ? (k.mejor === 'bajo' ? Math.min.apply(null, vs) : Math.max.apply(null, vs)) : null;
+      OLS.forEach(function (o) {
+        var v = w.v[o] ? w.v[o][i] : null, ok = cumple(k, v, m), top = ok && v === mejor, p = ok ? (top ? 5 : 3) : 0;
+        if (v != null) r[o].conDato = true;
+        r[o].pts += p; if (top) r[o].mejores++; if (ok) r[o].metas++;
+        r[o].k.push({ v: v, p: p, ok: ok, top: top });
+      });
+    });
+    return r;
+  }
+  var ordenar = function (a, b, c) { return b[c] - a[c] || b.mejores - a.mejores || b.metas - a.metas || a.ol.localeCompare(b.ol, 'es'); };
+  var PS = {}; D.semanas.forEach(function (w) { PS[w.id] = puntosSemana(w); });
+  var semDe = function (id) { return D.semanas.filter(function (w) { return w.id === id; })[0]; };
+  var mesDe = function (id) { return D.meses.filter(function (m) { return m.id === id; })[0]; };
+  var semanasDelMes = function (id) { return D.semanas.filter(function (w) { return w.mes === id; }); };
+
+  function datosVista() {
+    if (st.vista === 'semana') {
+      var w = semDe(st.sem), p = PS[w.id];
+      var filas = OLS.map(function (o) { return p[o]; }).filter(function (x) { return x.conDato; }).sort(function (a, b) { return ordenar(a, b, 'pts'); });
+      return { tipo: 'semana', w: w, filas: filas, max: 5 * K.length, vals: w.v, metas: w.metas };
+    }
+    var m = mesDe(st.mes), ws = semanasDelMes(m.id);
+    var filas = OLS.map(function (o) {
+      var x = { ol: o, total: 0, mejores: 0, metas: 0, sems: [], k: K.map(function () { return { p: 0, mej: 0 }; }) };
+      ws.forEach(function (w) { var q = PS[w.id][o]; x.sems.push(q.conDato ? q.pts : null); x.total += q.pts; x.mejores += q.mejores; x.metas += q.metas; q.k.forEach(function (c, i) { x.k[i].p += c.p; if (c.top) x.k[i].mej++; }); });
+      x.conDato = !!m.v[o] || x.sems.some(function (s) { return s != null; });
+      x.k.forEach(function (c, i) { c.v = m.v[o] ? m.v[o][i] : null; c.ok = cumple(K[i], c.v, m.metas[i]); });
+      return x;
+    }).filter(function (x) { return x.conDato; }).sort(function (a, b) { return ordenar(a, b, 'total'); });
+    return { tipo: 'mes', m: m, ws: ws, filas: filas, max: 5 * K.length * ws.length, vals: m.v, metas: m.metas };
+  }
+
+  function render() {
+    $('bSem').setAttribute('aria-pressed', st.vista === 'semana'); $('bMes').setAttribute('aria-pressed', st.vista === 'mes');
+    var sel = $('sel');
+    if (st.vista === 'semana') { $('selLbl').textContent = 'SEMANA'; sel.innerHTML = D.semanas.slice().reverse().map(function (w) { return '<option value="' + w.id + '">' + esc(w.label) + (w.enCurso ? ' (en curso)' : '') + '</option>'; }).join(''); sel.value = st.sem; }
+    else { $('selLbl').textContent = 'MES'; sel.innerHTML = D.meses.slice().reverse().map(function (m) { return '<option value="' + m.id + '">' + esc(m.label) + '</option>'; }).join(''); sel.value = st.mes; }
+    var V = datosVista();
+    if (V.tipo === 'semana') { $('tit').textContent = V.w.label; $('subt').textContent = 'Cada KPI en meta suma 3 puntos y el mejor OL de cada KPI suma 5. Máximo ' + V.max + ' por semana.' + (V.w.enCurso ? ' Semana en curso: los puntos todavía pueden cambiar.' : ''); }
+    else { $('tit').textContent = V.m.label; $('subt').textContent = 'Resultado de los KPIs en el mes y suma de los puntos de sus ' + V.ws.length + ' semanas. Máximo ' + V.max + '.'; }
+    /* podio */
+    $('podio').innerHTML = V.filas.map(function (x, i) {
+      var pts = V.tipo === 'semana' ? x.pts : x.total, g = i === 0 && pts > 0;
+      return '<div class="card pc' + (g ? ' g1' : '') + '"><div style="display:flex;justify-content:space-between;align-items:center"><span class="pos">' + (i + 1) + '°</span><span class="etq">' + (g ? (V.tipo === 'semana' ? 'Ganador de la semana' : 'Campeón del mes') : '') + '</span></div><span class="ol">' + esc(x.ol) + '</span><div style="display:flex;align-items:baseline;gap:8px"><span class="pts">' + pts + '</span><span class="max">de ' + V.max + ' puntos</span></div><div class="bf"><div class="bb" style="width:' + (V.max ? Math.round(pts / V.max * 100) : 0) + '%"></div></div></div>';
+    }).join('') || '<div class="card vacio">Sin datos en este período.</div>';
+    /* tabla */
+    var th = '<th class="l" style="width:52px;padding-left:16px">#</th><th class="l">OPERADOR LOGÍSTICO</th>' + K.map(function (k, i) { return '<th><div>' + esc(k.nombre) + '</div><div class="m">Meta ' + metaTxt(k, V.metas[i]) + '</div></th>'; }).join('');
+    var celda = function (k, c, txt) { var cl = c.v == null ? 'sd' : c.top ? 'top' : c.ok ? 'ok' : 'mal'; return '<td class="' + cl + '"><div class="v">' + fmt(k, c.v) + '</div><div class="p">' + txt + '</div></td>'; };
+    var pos = function (i) { return '<td class="l" style="padding-left:16px"><span class="np p' + (i + 1) + '">' + (i + 1) + '</span></td>'; };
+    var tb;
+    if (V.tipo === 'semana') {
+      th += '<th class="l" style="text-align:center">PUNTOS</th>';
+      tb = V.filas.map(function (x, i) { return '<tr>' + pos(i) + '<td class="l"><b>' + esc(x.ol) + '</b><small>' + x.metas + ' de ' + K.length + ' KPIs en meta</small></td>' + x.k.map(function (c, j) { return celda(K[j], c, c.v == null ? 'sin dato' : c.top ? '+5 pts · mejor' : c.ok ? '+3 pts' : '0 pts'); }).join('') + '<td><span class="tot">' + x.pts + '</span></td></tr>'; }).join('');
+    } else {
+      th += V.ws.map(function (w) { return '<th style="width:64px"><div>' + esc(w.corto) + '</div><div class="w">pts</div></th>'; }).join('') + '<th class="l" style="text-align:center">TOTAL</th>';
+      tb = V.filas.map(function (x, i) { return '<tr>' + pos(i) + '<td class="l"><b>' + esc(x.ol) + '</b><small>' + (x.mejores === 1 ? '1 vez mejor' : x.mejores + ' veces mejor') + ' en un KPI</small></td>' + x.k.map(function (c, j) { return celda(K[j], { v: c.v, ok: c.ok, top: false }, c.p + ' pts' + (c.mej ? ' · ' + c.mej + (c.mej === 1 ? ' vez mejor' : ' veces mejor') : '')); }).join('') + x.sems.map(function (s) { return '<td class="wk">' + (s == null ? '—' : s) + '</td>'; }).join('') + '<td><span class="tot">' + x.total + '</span></td></tr>'; }).join('');
+    }
+    $('tabla').innerHTML = '<table><thead><tr>' + th + '</tr></thead><tbody>' + (tb || '<tr><td colspan="99" class="vacio">Sin datos en este período.</td></tr>') + '</tbody></table>' +
+      (V.tipo === 'mes' ? '<p class="nota">Cada celda: resultado del KPI en el mes (meta del mes) y los puntos que sumó en ese KPI en las semanas del mes. ' + V.ws.map(function (w) { return w.corto + ': ' + w.rango; }).join(' · ') + '. Cada semana cuenta en el mes en el que cae su jueves.</p>' : '<p class="nota">Rechazo no oficial. Semana de lunes a domingo. Desempate: más veces mejor en un KPI y después más KPIs en meta.</p>');
+    /* pareto por KPI */
+    $('parSub').textContent = (V.tipo === 'semana' ? 'Resultado de ' + V.w.label.toLowerCase() : 'Resultado de ' + V.m.label) + ', ordenado de peor a mejor: arriba queda el que más lejos está de la meta.';
+    $('graf').innerHTML = K.map(function (k, i) {
+      var m = V.metas[i];
+      var xs = OLS.map(function (o) { return { ol: o, v: V.vals[o] ? V.vals[o][i] : null }; }).filter(function (x) { return x.v != null; });
+      if (!xs.length) return '<div class="card gc"><div class="hd"><b>' + esc(k.nombre) + '</b><span>Meta ' + metaTxt(k, m) + '</span></div><div class="vacio">Sin datos</div></div>';
+      var nums = xs.map(function (x) { return x.v; }); if (m != null) nums.push(m);
+      var mn = Math.min.apply(null, nums), mx = Math.max.apply(null, nums);
+      var lo = k.mejor === 'bajo' ? 0 : mn - (mx - mn || Math.abs(mx) * 0.1 || 1) * 0.8, hi = mx + (mx - lo) * 0.08 || 1;
+      var pc = function (v) { return Math.max(2, Math.min(100, Math.round((v - lo) / (hi - lo) * 1000) / 10)); };
+      xs.sort(function (a, b) { return k.mejor === 'bajo' ? b.v - a.v : a.v - b.v; });
+      var ok = xs.filter(function (x) { return cumple(k, x.v, m); }).length;
+      return '<div class="card gc"><div class="hd"><b>' + esc(k.nombre) + '</b><span>Meta ' + metaTxt(k, m) + '</span></div><div style="display:flex;flex-direction:column;gap:12px">' +
+        xs.map(function (x) { var c = cumple(k, x.v, m); return '<div class="br"><span class="n" title="' + esc(x.ol) + '">' + esc(x.ol) + '</span><div class="t"><div class="b" style="width:' + pc(x.v) + '%;background:' + (c ? '#1f9a4a' : '#d64545') + '"></div>' + (m != null ? '<div class="mt" style="left:' + pc(m) + '%"></div>' : '') + '</div><span class="x" style="color:' + (c ? '#17663a' : '#a32626') + '">' + fmt(k, x.v) + '</span></div>'; }).join('') +
+        '</div><div class="pie"><span>' + (k.mejor === 'bajo' ? 'De mayor a menor (menos es mejor)' : 'De menor a mayor (más es mejor)') + '</span><span>' + ok + ' de ' + xs.length + ' en meta</span></div></div>';
+    }).join('');
+    if (window.parent !== window) try { window.parent.postMessage({ campeonatoAlto: Math.ceil(document.body.getBoundingClientRect().height) }, '*'); } catch (e) {}
+  }
+
+  function descargar() {
+    var V = datosVista(), sep = ';', L = [];
+    var q = function (s) { s = String(s == null ? '' : s); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    L.push([V.tipo === 'semana' ? V.w.label : V.m.label]);
+    var cab = ['Posición', 'Operador logístico']; K.forEach(function (k, i) { cab.push(k.nombre + ' (meta ' + metaTxt(k, V.metas[i]) + ')', 'Puntos ' + k.nombre); });
+    if (V.tipo === 'mes') V.ws.forEach(function (w) { cab.push('Puntos ' + w.corto + ' (' + w.rango + ')'); });
+    cab.push(V.tipo === 'semana' ? 'Puntos' : 'Total'); L.push(cab);
+    V.filas.forEach(function (x, i) { var r = [i + 1, x.ol]; x.k.forEach(function (c, j) { r.push(fmt(K[j], c.v), c.p); }); if (V.tipo === 'mes') x.sems.forEach(function (s) { r.push(s == null ? '' : s); }); r.push(V.tipo === 'semana' ? x.pts : x.total); L.push(r); });
+    var blob = new Blob(['﻿' + L.map(function (r) { return r.map(q).join(sep); }).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'campeonato_' + (V.tipo === 'semana' ? 'semana_' + V.w.id : 'mes_' + V.m.id) + '.csv'; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+
+  $('al').textContent = 'Datos al ' + D.dataAl;
+  $('bSem').onclick = function () { st.vista = 'semana'; render(); };
+  $('bMes').onclick = function () { if (D.meses.length) { st.vista = 'mes'; render(); } };
+  $('sel').onchange = function (e) { if (st.vista === 'semana') st.sem = e.target.value; else st.mes = e.target.value; render(); };
+  $('bDesc').onclick = descargar;
+  render();
+  window.addEventListener('resize', function () { if (window.parent !== window) try { window.parent.postMessage({ campeonatoAlto: Math.ceil(document.body.getBoundingClientRect().height) }, '*'); } catch (e) {} });
+})();
+</script>
+</body>
+</html>
