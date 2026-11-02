@@ -64,12 +64,12 @@ td.ok .p{color:var(--okT)}td.mal .p{color:var(--malT)}td.top .p{color:var(--topT
 .ley{display:flex;gap:22px;font-size:13px;color:var(--gris2);padding:0 4px;flex-wrap:wrap}
 .ley span{display:flex;align-items:center;gap:8px}
 .ley i{width:14px;height:14px;border-radius:4px;display:inline-block}
-.graf{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.graf{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
 .gc{padding:18px;display:flex;flex-direction:column;gap:14px}
 .gc .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .gc .hd b{font-size:16px;color:var(--tit)}
 .gc .hd span{font-size:12px;font-weight:700;color:var(--verde);white-space:nowrap}
-.br{display:grid;grid-template-columns:140px minmax(0,1fr) 66px;gap:10px;align-items:center}
+.br{display:grid;grid-template-columns:120px minmax(0,1fr) 62px;gap:10px;align-items:center}
 .br .n{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .br .t{position:relative;height:22px;background:var(--fondo);border-radius:6px}
 .br .b{position:absolute;left:0;top:0;bottom:0;border-radius:6px}
@@ -77,7 +77,7 @@ td.ok .p{color:var(--okT)}td.mal .p{color:var(--malT)}td.top .p{color:var(--topT
 .br .x{text-align:right;font-size:13px;font-weight:700}
 .gc .pie{display:flex;justify-content:space-between;font-size:12px;color:var(--gris);border-top:1px solid #f0f0f2;padding-top:10px}
 .vacio{padding:30px;text-align:center;color:var(--gris2)}
-@media (max-width:1100px){.graf{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:1300px){.graf{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:700px){main{padding:16px}header{padding:12px 16px}.graf{grid-template-columns:1fr}}
 </style>
 <script src="datos_campeonato.js"></script>
@@ -140,6 +140,7 @@ td.ok .p{color:var(--okT)}td.mal .p{color:var(--malT)}td.top .p{color:var(--topT
   var nf = function (v, d) { return v.toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d }); };
   var fmt = function (k, v) { if (v == null) return '—'; return k.fmt === 'pct' ? nf(v * 100, k.dec === 2 ? 2 : k.dec === 0 ? 0 : 1) + '%' : nf(v, 2); };
   var metaTxt = function (k, m) { return m == null ? 'sin meta' : (k.mejor === 'bajo' ? '≤ ' : '≥ ') + fmt(k, m); };
+  var metaLbl = function (k, m) { return m == null ? 'Sin meta' : 'Meta ' + metaTxt(k, m); };
   var cumple = function (k, v, m) { return v != null && m != null && (k.mejor === 'bajo' ? v <= m : v >= m); };
   var st = { vista: 'semana', sem: D.semanas[D.semanas.length - 1].id, mes: D.meses.length ? D.meses[D.meses.length - 1].id : '' };
 
@@ -154,7 +155,7 @@ td.ok .p{color:var(--okT)}td.mal .p{color:var(--malT)}td.top .p{color:var(--topT
         var v = w.v[o] ? w.v[o][i] : null, ok = cumple(k, v, m), top = ok && v === mejor, p = ok ? (top ? 5 : 3) : 0;
         if (v != null) r[o].conDato = true;
         r[o].pts += p; if (top) r[o].mejores++; if (ok) r[o].metas++;
-        r[o].k.push({ v: v, p: p, ok: ok, top: top });
+        r[o].k.push({ v: v, p: p, ok: ok, top: top, sm: m == null });
       });
     });
     return r;
@@ -176,7 +177,7 @@ td.ok .p{color:var(--okT)}td.mal .p{color:var(--malT)}td.top .p{color:var(--topT
       var x = { ol: o, total: 0, mejores: 0, metas: 0, sems: [], k: K.map(function () { return { p: 0, mej: 0 }; }) };
       ws.forEach(function (w) { var q = PS[w.id][o]; x.sems.push(q.conDato ? q.pts : null); x.total += q.pts; x.mejores += q.mejores; x.metas += q.metas; q.k.forEach(function (c, i) { x.k[i].p += c.p; if (c.top) x.k[i].mej++; }); });
       x.conDato = !!m.v[o] || x.sems.some(function (s) { return s != null; });
-      x.k.forEach(function (c, i) { c.v = m.v[o] ? m.v[o][i] : null; c.ok = cumple(K[i], c.v, m.metas[i]); });
+      x.k.forEach(function (c, i) { c.v = m.v[o] ? m.v[o][i] : null; c.ok = cumple(K[i], c.v, m.metas[i]); c.sm = m.metas[i] == null; });
       return x;
     }).filter(function (x) { return x.conDato; }).sort(function (a, b) { return ordenar(a, b, 'total'); });
     return { tipo: 'mes', m: m, ws: ws, filas: filas, max: 5 * K.length * ws.length, vals: m.v, metas: m.metas };
@@ -196,16 +197,16 @@ td.ok .p{color:var(--okT)}td.mal .p{color:var(--malT)}td.top .p{color:var(--topT
       return '<div class="card pc' + (g ? ' g1' : '') + '"><div style="display:flex;justify-content:space-between;align-items:center"><span class="pos">' + (i + 1) + '°</span><span class="etq">' + (g ? (V.tipo === 'semana' ? 'Ganador de la semana' : 'Campeón del mes') : '') + '</span></div><span class="ol">' + esc(x.ol) + '</span><div style="display:flex;align-items:baseline;gap:8px"><span class="pts">' + pts + '</span><span class="max">de ' + V.max + ' puntos</span></div><div class="bf"><div class="bb" style="width:' + (V.max ? Math.round(pts / V.max * 100) : 0) + '%"></div></div></div>';
     }).join('') || '<div class="card vacio">Sin datos en este período.</div>';
     /* tabla */
-    var th = '<th class="l" style="width:52px;padding-left:16px">#</th><th class="l">OPERADOR LOGÍSTICO</th>' + K.map(function (k, i) { return '<th><div>' + esc(k.nombre) + '</div><div class="m">Meta ' + metaTxt(k, V.metas[i]) + '</div></th>'; }).join('');
-    var celda = function (k, c, txt) { var cl = c.v == null ? 'sd' : c.top ? 'top' : c.ok ? 'ok' : 'mal'; return '<td class="' + cl + '"><div class="v">' + fmt(k, c.v) + '</div><div class="p">' + txt + '</div></td>'; };
+    var th = '<th class="l" style="width:52px;padding-left:16px">#</th><th class="l">OPERADOR LOGÍSTICO</th>' + K.map(function (k, i) { return '<th><div>' + esc(k.nombre) + '</div><div class="m">' + metaLbl(k, V.metas[i]) + '</div></th>'; }).join('');
+    var celda = function (k, c, txt) { var cl = c.v == null || c.sm ? 'sd' : c.top ? 'top' : c.ok ? 'ok' : 'mal'; return '<td class="' + cl + '"><div class="v">' + fmt(k, c.v) + '</div><div class="p">' + txt + '</div></td>'; };
     var pos = function (i) { return '<td class="l" style="padding-left:16px"><span class="np p' + (i + 1) + '">' + (i + 1) + '</span></td>'; };
     var tb;
     if (V.tipo === 'semana') {
       th += '<th class="l" style="text-align:center">PUNTOS</th>';
-      tb = V.filas.map(function (x, i) { return '<tr>' + pos(i) + '<td class="l"><b>' + esc(x.ol) + '</b><small>' + x.metas + ' de ' + K.length + ' KPIs en meta</small></td>' + x.k.map(function (c, j) { return celda(K[j], c, c.v == null ? 'sin dato' : c.top ? '+5 pts · mejor' : c.ok ? '+3 pts' : '0 pts'); }).join('') + '<td><span class="tot">' + x.pts + '</span></td></tr>'; }).join('');
+      tb = V.filas.map(function (x, i) { return '<tr>' + pos(i) + '<td class="l"><b>' + esc(x.ol) + '</b><small>' + x.metas + ' de ' + K.length + ' KPIs en meta</small></td>' + x.k.map(function (c, j) { return celda(K[j], c, c.v == null ? 'sin dato' : c.sm ? 'sin meta · no suma' : c.top ? '+5 pts · mejor' : c.ok ? '+3 pts' : '0 pts'); }).join('') + '<td><span class="tot">' + x.pts + '</span></td></tr>'; }).join('');
     } else {
       th += V.ws.map(function (w) { return '<th style="width:64px"><div>' + esc(w.corto) + '</div><div class="w">pts</div></th>'; }).join('') + '<th class="l" style="text-align:center">TOTAL</th>';
-      tb = V.filas.map(function (x, i) { return '<tr>' + pos(i) + '<td class="l"><b>' + esc(x.ol) + '</b><small>' + (x.mejores === 1 ? '1 vez mejor' : x.mejores + ' veces mejor') + ' en un KPI</small></td>' + x.k.map(function (c, j) { return celda(K[j], { v: c.v, ok: c.ok, top: false }, c.p + ' pts' + (c.mej ? ' · ' + c.mej + (c.mej === 1 ? ' vez mejor' : ' veces mejor') : '')); }).join('') + x.sems.map(function (s) { return '<td class="wk">' + (s == null ? '—' : s) + '</td>'; }).join('') + '<td><span class="tot">' + x.total + '</span></td></tr>'; }).join('');
+      tb = V.filas.map(function (x, i) { return '<tr>' + pos(i) + '<td class="l"><b>' + esc(x.ol) + '</b><small>' + (x.mejores === 1 ? '1 vez mejor' : x.mejores + ' veces mejor') + ' en un KPI</small></td>' + x.k.map(function (c, j) { return celda(K[j], { v: c.v, ok: c.ok, top: false, sm: c.sm }, c.sm ? 'sin meta · no suma' : c.p + ' pts' + (c.mej ? ' · ' + c.mej + (c.mej === 1 ? ' vez mejor' : ' veces mejor') : '')); }).join('') + x.sems.map(function (s) { return '<td class="wk">' + (s == null ? '—' : s) + '</td>'; }).join('') + '<td><span class="tot">' + x.total + '</span></td></tr>'; }).join('');
     }
     $('tabla').innerHTML = '<table><thead><tr>' + th + '</tr></thead><tbody>' + (tb || '<tr><td colspan="99" class="vacio">Sin datos en este período.</td></tr>') + '</tbody></table>' +
       (V.tipo === 'mes' ? '<p class="nota">Cada celda: resultado del KPI en el mes (meta del mes) y los puntos que sumó en ese KPI en las semanas del mes. ' + V.ws.map(function (w) { return w.corto + ': ' + w.rango; }).join(' · ') + '. Cada semana cuenta en el mes en el que cae su jueves.</p>' : '<p class="nota">Rechazo no oficial. Semana de lunes a domingo. Desempate: más veces mejor en un KPI y después más KPIs en meta.</p>');
@@ -214,16 +215,16 @@ td.ok .p{color:var(--okT)}td.mal .p{color:var(--malT)}td.top .p{color:var(--topT
     $('graf').innerHTML = K.map(function (k, i) {
       var m = V.metas[i];
       var xs = OLS.map(function (o) { return { ol: o, v: V.vals[o] ? V.vals[o][i] : null }; }).filter(function (x) { return x.v != null; });
-      if (!xs.length) return '<div class="card gc"><div class="hd"><b>' + esc(k.nombre) + '</b><span>Meta ' + metaTxt(k, m) + '</span></div><div class="vacio">Sin datos</div></div>';
+      if (!xs.length) return '<div class="card gc"><div class="hd"><b>' + esc(k.nombre) + '</b><span>' + metaLbl(k, m) + '</span></div><div class="vacio">Sin datos</div></div>';
       var nums = xs.map(function (x) { return x.v; }); if (m != null) nums.push(m);
       var mn = Math.min.apply(null, nums), mx = Math.max.apply(null, nums);
       var lo = k.mejor === 'bajo' ? 0 : mn - (mx - mn || Math.abs(mx) * 0.1 || 1) * 0.8, hi = mx + (mx - lo) * 0.08 || 1;
       var pc = function (v) { return Math.max(2, Math.min(100, Math.round((v - lo) / (hi - lo) * 1000) / 10)); };
       xs.sort(function (a, b) { return k.mejor === 'bajo' ? b.v - a.v : a.v - b.v; });
       var ok = xs.filter(function (x) { return cumple(k, x.v, m); }).length;
-      return '<div class="card gc"><div class="hd"><b>' + esc(k.nombre) + '</b><span>Meta ' + metaTxt(k, m) + '</span></div><div style="display:flex;flex-direction:column;gap:12px">' +
-        xs.map(function (x) { var c = cumple(k, x.v, m); return '<div class="br"><span class="n" title="' + esc(x.ol) + '">' + esc(x.ol) + '</span><div class="t"><div class="b" style="width:' + pc(x.v) + '%;background:' + (c ? '#1f9a4a' : '#d64545') + '"></div>' + (m != null ? '<div class="mt" style="left:' + pc(m) + '%"></div>' : '') + '</div><span class="x" style="color:' + (c ? '#17663a' : '#a32626') + '">' + fmt(k, x.v) + '</span></div>'; }).join('') +
-        '</div><div class="pie"><span>' + (k.mejor === 'bajo' ? 'De mayor a menor (menos es mejor)' : 'De menor a mayor (más es mejor)') + '</span><span>' + ok + ' de ' + xs.length + ' en meta</span></div></div>';
+      return '<div class="card gc"><div class="hd"><b>' + esc(k.nombre) + '</b><span>' + metaLbl(k, m) + '</span></div><div style="display:flex;flex-direction:column;gap:12px">' +
+        xs.map(function (x) { var c = cumple(k, x.v, m), col = m == null ? '#9a9aa1' : c ? '#1f9a4a' : '#d64545'; return '<div class="br"><span class="n" title="' + esc(x.ol) + '">' + esc(x.ol) + '</span><div class="t"><div class="b" style="width:' + pc(x.v) + '%;background:' + col + '"></div>' + (m != null ? '<div class="mt" style="left:' + pc(m) + '%"></div>' : '') + '</div><span class="x" style="color:' + (m == null ? '#5f5f66' : c ? '#17663a' : '#a32626') + '">' + fmt(k, x.v) + '</span></div>'; }).join('') +
+        '</div><div class="pie"><span>' + (k.mejor === 'bajo' ? 'De mayor a menor (menos es mejor)' : 'De menor a mayor (más es mejor)') + '</span><span>' + (m == null ? 'Sin meta: no suma puntos' : ok + ' de ' + xs.length + ' en meta') + '</span></div></div>';
     }).join('');
     if (window.parent !== window) try { window.parent.postMessage({ campeonatoAlto: Math.ceil(document.body.getBoundingClientRect().height) }, '*'); } catch (e) {}
   }
@@ -232,7 +233,7 @@ td.ok .p{color:var(--okT)}td.mal .p{color:var(--malT)}td.top .p{color:var(--topT
     var V = datosVista(), sep = ';', L = [];
     var q = function (s) { s = String(s == null ? '' : s); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
     L.push([V.tipo === 'semana' ? V.w.label : V.m.label]);
-    var cab = ['Posición', 'Operador logístico']; K.forEach(function (k, i) { cab.push(k.nombre + ' (meta ' + metaTxt(k, V.metas[i]) + ')', 'Puntos ' + k.nombre); });
+    var cab = ['Posición', 'Operador logístico']; K.forEach(function (k, i) { cab.push(k.nombre + ' (' + metaLbl(k, V.metas[i]).toLowerCase() + ')', 'Puntos ' + k.nombre); });
     if (V.tipo === 'mes') V.ws.forEach(function (w) { cab.push('Puntos ' + w.corto + ' (' + w.rango + ')'); });
     cab.push(V.tipo === 'semana' ? 'Puntos' : 'Total'); L.push(cab);
     V.filas.forEach(function (x, i) { var r = [i + 1, x.ol]; x.k.forEach(function (c, j) { r.push(fmt(K[j], c.v), c.p); }); if (V.tipo === 'mes') x.sems.forEach(function (s) { r.push(s == null ? '' : s); }); r.push(V.tipo === 'semana' ? x.pts : x.total); L.push(r); });
