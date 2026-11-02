@@ -224,7 +224,7 @@ html{scroll-behavior:smooth}
 <header class="topbar">
   <div class="brand">
     <h1>DASHBOARD DISTRI</h1>
-    <small>KPIs de choferes y operadores logísticos · versión 2026-10-30 09:05</small>
+    <small>KPIs de choferes y operadores logísticos · versión 2026-11-02 12:35</small>
   </div>
   <div class="fresh">
     <span id="freshText"><span class="dot off"></span>Sin datos cargados</span>
@@ -249,6 +249,8 @@ html{scroll-behavior:smooth}
       <button data-p="dia">Día</button><button data-p="semana">Semana</button><button data-p="mes" aria-pressed="true">Mes</button><button data-p="rango">Rango</button>
     </div>
   </div>
+  <div class="field" id="fAnio"><label for="selAnio">Año</label><select id="selAnio" style="min-width:100px"></select></div>
+  <div class="field" id="fMesF" hidden><label for="selMesF">Mes</label><select id="selMesF" style="min-width:130px"></select></div>
   <div class="field" id="fPick"><label for="selPick" id="lblPick">Mes</label><select id="selPick"></select></div>
   <div class="field" id="fDesde" hidden><label for="inDesde">Desde</label><input type="date" id="inDesde"></div>
   <div class="field" id="fHasta" hidden><label for="inHasta">Hasta</label><input type="date" id="inHasta"></div>
@@ -1809,6 +1811,9 @@ const planGrupo = new Map();
           const k = f + '|' + p + '|' + c; const v = vis.get(k) || { f, p, c, hl: 0, imp: 0, mt: c3.mt ? String(r[c3.mt] == null ? '' : r[c3.mt]).trim() : '' }; v.hl += c3.hl ? num(r[c3.hl]) : 0; v.imp += c3.imp ? num(r[c3.imp]) : 0; vis.set(k, v); }
         R.pcUnicos = pcU.size;
         const dias = (a, b) => (a && b) ? Math.abs((Date.parse(a) - Date.parse(b)) / 864e5) : 0;
+        /* OL de cada planilla según la bajada de rechazo (el que más se repite, solo OL propios) */
+        const olRchPlan = new Map(); { const cnt = new Map(); for (const x of rch) { if (!x.planilla || x.ol === OL_OCULTO) continue; const m = mapOL(x.ol); if (m.ol === AGUANOR) continue; const c = cnt.get(x.planilla) || new Map(); c.set(x.ol, (c.get(x.ol) || 0) + 1); cnt.set(x.planilla, c); }
+          for (const [p, c] of cnt) { let mx = 0, o = ''; for (const [k, n] of c) if (n > mx) { mx = n; o = k; } olRchPlan.set(p, o); } }
         for (const v of vis.values()) {
           D.refac.visitas++;
           /* chat de esa planilla + cliente, en la fecha más cercana (±3 días; sin fecha en Chat Tonic, el primero) */
@@ -1823,7 +1828,10 @@ const planGrupo = new Map();
           if (!sx) sx = sal.get(v.p) || null;   /* como el BUSCARV del Excel: solo por planilla, aunque sea de otra fecha */
           const canal = canalPlanCli(v.p, v.c) || 'Mino';
           let ol = sx ? sx.ol : '', dni = sx ? sx.dni : '';
-          const oculto = !sx || !ol || mapOL(ol).ol === AGUANOR || olExcluido(ol, v.f);
+          /* Si SALIDA no trae un OL propio para esa planilla (OL vacío u otro fletero), se toma el OL que tiene esa planilla
+             en la bajada de rechazo (el mismo criterio del tablero) y, si no, el de BEES */
+          if (!ol || mapOL(ol).ol === AGUANOR) { const o2 = olRchPlan.get(v.p) || (olBeesPlan(v.p, v.f) && mapOL(olBeesPlan(v.p, v.f)).ol !== AGUANOR ? olBeesPlan(v.p, v.f) : ''); if (o2) { ol = o2; D.refac.olOtraFuente = (D.refac.olOtraFuente || 0) + 1; } }
+          const oculto = !ol || mapOL(ol).ol === AGUANOR || olExcluido(ol, v.f);
           if (!sx) { D.refac.sinChofer++; const so = sal.get(v.p); D.refac.listaSinSal.push([v.f, v.p, v.c, ref ? 'SI' : 'NO', '']); }
           let g;
           if (oculto) { const kh = 'FH|' + v.f + '|' + canal; g = grupos.get(kh); if (!g) { g = base(v.f, '', OL_OCULTO, canal); g.olOrig = 'Refacturaciones sin chofer u OL propio'; grupos.set(kh, g); } }
@@ -2157,7 +2165,7 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&am
 
 /* ---------- datos y estado ---------- */
 let DATA = null, FECHAS = [], MESES_DISP = [];
-const S = { per: 'mes', pick: '', desde: '', hasta: '', ol: '', canal: '', chofer: '', vista: 'resumen', kpi: 'rchHL', evo: 'dia', mat: 'dia', rank: 'rchHL', sinAg: true, sortCol: null, sortDir: 1, buscar: '', min: 5, agMot: '' };
+const S = { per: 'mes', pick: '', desde: '', hasta: '', ol: '', canal: '', chofer: '', vista: 'resumen', kpi: 'rchHL', evo: 'dia', mat: 'dia', rank: 'rchHL', sinAg: true, sortCol: null, sortDir: 1, buscar: '', min: 5, agMot: '', anio: '', mesF: '' };
 const nombreChofer = dni => (DATA.choferes[dni] && DATA.choferes[dni].nombre) || (dni ? 'DNI ' + dni : 'Sin chofer asignado');
 
 function sumar(filas) { const s = {}; CAMPOS.forEach(c => s[c] = 0); for (const r of filas) for (const c of CAMPOS) s[c] += r[c] || 0; return s; }
@@ -2169,6 +2177,7 @@ function rangoActual() {
   if (S.per === 'mes' && /^\d{4}-\d{2}$/.test(S.pick)) return { desde: S.pick + '-01', hasta: finMes(S.pick) };
   if (S.per === 'semana' && S.pick) return { desde: S.pick, hasta: addDays(S.pick, 6) };
   if (S.per === 'dia' && S.pick) return { desde: S.pick, hasta: S.pick };
+  if (S.per === 'anio' && /^\d{4}$/.test(S.pick)) return { desde: S.pick + '-01-01', hasta: S.pick + '-12-31' };
   if (S.per === 'rango' && S.desde && S.hasta) return { desde: S.desde, hasta: S.hasta };
   const ult = FECHAS[FECHAS.length - 1] || ''; const ym = ult.slice(0, 7);
   return ym ? { desde: ym + '-01', hasta: finMes(ym) } : { desde: '', hasta: '' };
@@ -2177,6 +2186,7 @@ function rangoAnterior(r) {
   if (!r.desde) return { desde: '', hasta: '', nombre: 'período anterior' };
   if (S.per === 'mes') { const d = toD(r.desde); d.setUTCMonth(d.getUTCMonth() - 1); const ym = toS(d).slice(0, 7); return { desde: ym + '-01', hasta: finMes(ym), nombre: MESES[+ym.slice(5, 7) - 1] }; }
   if (S.per === 'semana') return { desde: addDays(r.desde, -7), hasta: addDays(r.hasta, -7), nombre: 'semana anterior' };
+  if (S.per === 'anio') { const y = String(+r.desde.slice(0, 4) - 1); return { desde: y + '-01-01', hasta: y + '-12-31', nombre: y }; }
   if (S.per === 'dia') { const i = FECHAS.indexOf(r.desde); const p = i > 0 ? FECHAS[i - 1] : addDays(r.desde, -1); return { desde: p, hasta: p, nombre: fCorta(p) }; }
   const n = Math.round((toD(r.hasta) - toD(r.desde)) / DIA) + 1; return { desde: addDays(r.desde, -n), hasta: addDays(r.desde, -1), nombre: 'período anterior' };
 }
@@ -2261,7 +2271,7 @@ function spark(vals) {
 /* ---------- vistas ---------- */
 function contexto(r) {
   if (!r.desde) return 'Sin datos para mostrar';
-  const per = S.per === 'mes' ? nomMes(r.desde.slice(0, 7)) : S.per === 'semana' ? `semana ${isoWeek(r.desde).w} (${fCorta(r.desde)} al ${fCorta(r.hasta)})` : S.per === 'dia' ? `${DIAS[dow(r.desde)]} ${fLarga(r.desde)}` : `${fLarga(r.desde)} al ${fLarga(r.hasta)}`;
+  const per = S.per === 'anio' ? 'año ' + r.desde.slice(0, 4) : S.per === 'mes' ? nomMes(r.desde.slice(0, 7)) : S.per === 'semana' ? `semana ${isoWeek(r.desde).w} (${fCorta(r.desde)} al ${fCorta(r.hasta)})` : S.per === 'dia' ? `${DIAS[dow(r.desde)]} ${fLarga(r.desde)}` : `${fLarga(r.desde)} al ${fLarga(r.hasta)}`;
   const partes = [`<b>${per}</b>`]; if (S.ol) partes.push(esc(S.ol)); if (S.canal) partes.push('canal ' + S.canal); if (S.chofer) partes.push('chofer ' + esc(S.chofer));
   return 'Mostrando ' + partes.join(', ');
 }
@@ -2705,7 +2715,7 @@ function renderRefac() {
   $('refSub').textContent = '';
   $('refRes').innerHTML = `<div class="minis" style="margin-bottom:10px"><div class="mini"><span>% refacturación</span><b>${p2(tot.refN, tot.refD)}</b>${k && k.meta != null ? ` <small>meta ${p2(k.meta, 1)}</small>` : ''}</div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="btnExpRef">⬇ Descargar refacturaciones (${nf0.format(det.length)})</button></div>
-    <p class="sub" style="margin:8px 0 0;white-space:normal">Control (todas las fechas): 3 30 8: ${nf0.format(D.filas3 || 0)} filas (una por producto)${D.sinPC3 ? ' · ' + nf0.format(D.sinPC3) + ' sin planilla o cliente (no se cuentan)' : ''}${D.sinF3 ? ' · ' + nf0.format(D.sinF3) + ' sin fecha (no se cuentan)' : ''} · ${nf0.format(D.pcUnicos || 0)} planilla + cliente distintos · ${nf0.format(D.visitas)} visitas (planilla + cliente + fecha de pedido) · ${nf0.format(D.refac)} refacturadas · ${nf0.format(D.sinChat)} sin registro en Chat Tonic (cuentan como NO) · ${nf0.format(D.sinChofer)} clientes con la planilla fuera de SALIDA (${nf0.format(D.planSinSal || 0)} planillas; suman al total, sin chofer).</p>
+    <p class="sub" style="margin:8px 0 0;white-space:normal">Control (todas las fechas): 3 30 8: ${nf0.format(D.filas3 || 0)} filas (una por producto)${D.sinPC3 ? ' · ' + nf0.format(D.sinPC3) + ' sin planilla o cliente (no se cuentan)' : ''}${D.sinF3 ? ' · ' + nf0.format(D.sinF3) + ' sin fecha (no se cuentan)' : ''} · ${nf0.format(D.pcUnicos || 0)} planilla + cliente distintos · ${nf0.format(D.visitas)} visitas (planilla + cliente + fecha de pedido) · ${nf0.format(D.refac)} refacturadas · ${nf0.format(D.sinChat)} sin registro en Chat Tonic (cuentan como NO) · ${nf0.format(D.sinChofer)} clientes con la planilla fuera de SALIDA (${nf0.format(D.planSinSal || 0)} planillas; suman al total, sin chofer)${D.olOtraFuente ? ' · ' + nf0.format(D.olOtraFuente) + ' clientes sin OL propio en SALIDA tomaron el OL de la bajada de rechazo o de BEES' : ''}.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn" id="btnRefSinSal">⬇ Planillas que no están en SALIDA (${nf0.format(D.planSinSal || 0)})</button><button class="btn" id="btnRefNoChat">⬇ Refacturaciones que no se hicieron por Chat Tonic (${nf0.format(detNo.length)})</button></div>`;
   const fl = f => f ? f.split('-').reverse().join('/') : '';
   $('btnRefSinSal').onclick = () => descargarCSV('refac_planillas_sin_salida.csv', [['Fecha de pedido (3 30 8)', 'Planilla', 'Cliente', 'Refacturado']].concat((D.listaSinSal || []).slice().sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : String(a[1]).localeCompare(String(b[1]))).map(x => [fl(x[0]), x[1], x[2], x[3]])));
@@ -2720,7 +2730,8 @@ function renderRefac() {
   /* por OL */
   const go = agrupar(fil.filter(x => x.refD), x => x.ol); noListar(go);
   const ro = [...go.entries()].map(([ol, rs]) => { const s = sumar(rs); return { ol, d: s.refD, n: s.refN }; }).sort((a, b) => a.ol.localeCompare(b.ol, 'es'));
-  $('tblRefOL').innerHTML = `<thead><tr><th class="l">OL</th><th>Clientes refacturados</th><th>Refacturados por Chat Tonic</th><th>% refacturación</th></tr></thead><tbody>${ro.map(x => `<tr><td class="l"><b>${esc(x.ol)}</b></td><td class="num">${nf0.format(x.d)}</td><td class="num">${nf0.format(x.n)}</td><td class="num"><b>${p2(x.n, x.d)}</b></td></tr>`).join('')}<tr class="total"><td class="l"><b>Total</b></td><td class="num">${nf0.format(tot.refD)}</td><td class="num">${nf0.format(tot.refN)}</td><td class="num"><b>${p2(tot.refN, tot.refD)}</b></td></tr></tbody>`;
+  $('tblRefOL').innerHTML = `<thead><tr><th class="l">OL</th><th>Clientes refacturados</th><th>Refacturados por Chat Tonic</th><th>% refacturación</th></tr></thead><tbody>${ro.map(x => `<tr><td class="l"><b>${esc(x.ol)}</b></td><td class="num">${nf0.format(x.d)}</td><td class="num">${nf0.format(x.n)}</td><td class="num"><b>${p2(x.n, x.d)}</b></td></tr>`).join('')}${(() => { const sd = ro.reduce((q, x) => q + x.d, 0), sn = ro.reduce((q, x) => q + x.n, 0), od = tot.refD - sd, on = tot.refN - sn;
+      return od > 0 ? `<tr class="sub"><td class="l" style="white-space:normal">Otros OL o sin OL en SALIDA (EB, Aguanor, otros fleteros)</td><td class="num">${nf0.format(od)}</td><td class="num">${nf0.format(on)}</td><td class="num"><b>${p2(on, od)}</b></td></tr><tr><td class="l"><b>Solo los OL de la lista</b></td><td class="num">${nf0.format(sd)}</td><td class="num">${nf0.format(sn)}</td><td class="num"><b>${p2(sn, sd)}</b></td></tr>` : ''; })()}<tr class="total"><td class="l"><b>Total (todos los clientes de la 3 30 8)</b></td><td class="num">${nf0.format(tot.refD)}</td><td class="num">${nf0.format(tot.refN)}</td><td class="num"><b>${p2(tot.refN, tot.refD)}</b></td></tr></tbody>`;
   /* por chofer */
   const gc = agrupar(fil.filter(x => x.dni && x.refD), x => x.dni);
   const rc = [...gc.entries()].map(([d, rs]) => { const s = sumar(rs); const mots = agrupar(det.filter(x => x[5] === d), x => x[6]); const top = [...mots.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 2).map(([m, l]) => m + ' (' + l.length + ')').join(' · '); return { d, nombre: nombreChofer(d), ol: (DATA.choferes[d] || {}).ol || rs[0].ol, cl: s.refD, n: s.refN, top }; }).filter(x => x.n > 0).sort((a, b) => b.n - a.n || b.n / b.cl - a.n / a.cl);
@@ -2802,11 +2813,27 @@ const n4 = v => v == null ? '' : String(Math.round(v * 10000) / 10000).replace('
 /* ---------- filtros y eventos ---------- */
 const $ = id => document.getElementById(id);
 function opcionesPick() {
+  /* Año y Mes al costado del período: filtran las opciones de Mes / Semana / Día */
   const sel = $('selPick'), lbl = $('lblPick');
-  $('fPick').hidden = S.per === 'rango'; $('fDesde').hidden = $('fHasta').hidden = S.per !== 'rango';
-  if (S.per === 'mes') { lbl.textContent = 'Mes'; sel.innerHTML = MESES_DISP.map(m => `<option value="${m}">${nomMes(m)}</option>`).join(''); if (!MESES_DISP.includes(S.pick)) S.pick = MESES_DISP[MESES_DISP.length - 1] || ''; }
-  if (S.per === 'semana') { lbl.textContent = 'Semana'; const ws = [...new Set(FECHAS.map(lunes))]; sel.innerHTML = ws.map(w => `<option value="${w}">Semana ${isoWeek(w).w} · ${fCorta(w)} al ${fCorta(addDays(w, 6))}</option>`).join(''); if (!ws.includes(S.pick)) S.pick = ws[ws.length - 1] || ''; }
-  if (S.per === 'dia') { lbl.textContent = 'Día'; sel.innerHTML = [...FECHAS].reverse().map(f => `<option value="${f}">${DIAS[dow(f)]} ${fLarga(f)}</option>`).join(''); if (!FECHAS.includes(S.pick)) S.pick = FECHAS[FECHAS.length - 1] || ''; }
+  const rango = S.per === 'rango';
+  $('fPick').hidden = rango; $('fAnio').hidden = rango; $('fMesF').hidden = rango || S.per === 'mes'; $('fDesde').hidden = $('fHasta').hidden = !rango;
+  if (rango) return;
+  const anios = [...new Set(FECHAS.map(f => f.slice(0, 4)))];
+  const desdePick = S.per === 'mes' ? S.pick.slice(0, 4) : (S.pick || '').slice(0, 4);
+  if (!anios.includes(S.anio)) S.anio = anios.includes(desdePick) ? desdePick : anios[anios.length - 1] || '';
+  $('selAnio').innerHTML = [...anios].reverse().map(y => `<option value="${y}">${y}</option>`).join(''); $('selAnio').value = S.anio;
+  const mesesA = MESES_DISP.filter(m => m.slice(0, 4) === S.anio);
+  const nomCorto = m => MESES[+m.slice(5, 7) - 1];
+  if (S.per === 'mes') {
+    lbl.textContent = 'Mes'; sel.innerHTML = mesesA.map(m => `<option value="${m}">${nomCorto(m)}</option>`).join('');
+    if (!mesesA.includes(S.pick)) S.pick = mesesA[mesesA.length - 1] || '';
+  } else {
+    if (!mesesA.includes(S.mesF)) S.mesF = mesesA.includes((S.pick || '').slice(0, 7)) ? S.pick.slice(0, 7) : mesesA[mesesA.length - 1] || '';
+    $('selMesF').innerHTML = mesesA.map(m => `<option value="${m}">${nomCorto(m)}</option>`).join(''); $('selMesF').value = S.mesF;
+    const fm = FECHAS.filter(f => f.slice(0, 7) === S.mesF);
+    if (S.per === 'semana') { lbl.textContent = 'Semana'; const ws = [...new Set(fm.map(lunes))]; sel.innerHTML = ws.map(w => `<option value="${w}">Semana ${isoWeek(w).w} · ${fCorta(w)} al ${fCorta(addDays(w, 6))}</option>`).join(''); if (!ws.includes(S.pick)) S.pick = ws[ws.length - 1] || ''; }
+    if (S.per === 'dia') { lbl.textContent = 'Día'; sel.innerHTML = [...fm].reverse().map(f => `<option value="${f}">${DIAS[dow(f)]} ${fLarga(f)}</option>`).join(''); if (!fm.includes(S.pick)) S.pick = fm[fm.length - 1] || ''; }
+  }
   sel.value = S.pick;
 }
 function syncFiltros() { $('selOL').value = S.ol; $('selCanal').value = S.canal; $('selAg').value = S.sinAg ? 'sin' : ''; $('inChofer').value = S.chofer; }
@@ -2814,8 +2841,10 @@ function syncFiltros() { $('selOL').value = S.ol; $('selCanal').value = S.canal;
 let eventosListos = false;
 function eventos() {
   if (eventosListos) return; eventosListos = true;
-  document.querySelectorAll('#segPer button').forEach(b => b.onclick = () => { S.per = b.dataset.p; S.min = { dia: 1, semana: 3, mes: 5, rango: 5 }[S.per]; $('inMin').value = S.min; document.querySelectorAll('#segPer button').forEach(x => x.setAttribute('aria-pressed', x === b)); S.pick = ''; opcionesPick(); render(); });
+  document.querySelectorAll('#segPer button').forEach(b => b.onclick = () => { if (S.pick && S.per !== 'rango') { S.mesF = S.pick.slice(0, 7); S.anio = S.pick.slice(0, 4); } if (S.per === 'mes' && b.dataset.p !== 'mes') S.mesF = S.pick.slice(0, 7); S.per = b.dataset.p; S.min = { dia: 1, semana: 3, mes: 5, rango: 5 }[S.per]; $('inMin').value = S.min; document.querySelectorAll('#segPer button').forEach(x => x.setAttribute('aria-pressed', x === b)); S.pick = ''; opcionesPick(); render(); });
   $('selPick').onchange = e => { S.pick = e.target.value; render(); };
+  $('selAnio').onchange = e => { S.anio = e.target.value; S.pick = ''; S.mesF = ''; opcionesPick(); render(); };
+  $('selMesF').onchange = e => { S.mesF = e.target.value; S.pick = ''; opcionesPick(); render(); };
   $('inDesde').onchange = e => { S.desde = e.target.value; render(); }; $('inHasta').onchange = e => { S.hasta = e.target.value; render(); };
   $('selOL').onchange = e => { S.ol = e.target.value; render(); };
   $('selCanal').onchange = e => { S.canal = e.target.value; render(); };
@@ -2879,7 +2908,7 @@ function iniciarVistas(datos) {
   if (S.rank !== 'general' && !ACT_TABLA.some(k => k.id === S.rank)) S.rank = ACT_TABLA.length ? ACT_TABLA[0].id : '';
   FECHAS = [...new Set(DATA.filas.map(r => r.f))].sort();
   MESES_DISP = [...new Set(FECHAS.map(f => f.slice(0, 7)))];
-  S.pick = ''; S.ol = ''; S.canal = ''; S.chofer = '';
+  S.pick = ''; S.anio = ''; S.mesF = ''; S.ol = ''; S.canal = ''; S.chofer = '';
   { const fi = (DATA.ajustes && DATA.ajustes.filtroInicial) || 'no oficial'; S.sinAg = !/no\s*oficial/i.test(fi); }
   S.desde = FECHAS[0] || ''; S.hasta = FECHAS[FECHAS.length - 1] || '';
   $('selOL').innerHTML = '<option value="">Todos</option>' + DATA.ols.map(o => `<option>${esc(o)}</option>`).join('');
@@ -2897,7 +2926,7 @@ const APP_HTML = "<!doctype html>\n<html lang=\"es\">\n<head>\n<meta charset=\"u
    - Si el navegador no permite recordar carpetas, usa el selector clásico.
    ===================================================================== */
 (function () {
-  const VERSION_TABLERO = '2026-10-30 09:05';
+  const VERSION_TABLERO = '2026-11-02 12:35';
   const g = id => document.getElementById(id);
   function mensaje(t, error) { const m = g('msg'); m.textContent = t; m.className = error ? 'err' : ''; }
   const hora = d => d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
