@@ -224,7 +224,7 @@ html{scroll-behavior:smooth}
 <header class="topbar">
   <div class="brand">
     <h1>DASHBOARD DISTRI</h1>
-    <small>KPIs de choferes y operadores logísticos · versión 2026-11-03 16:45</small>
+    <small>KPIs de choferes y operadores logísticos · versión 2026-11-03 18:35</small>
   </div>
   <div class="fresh">
     <span id="freshText"><span class="dot off"></span>Sin datos cargados</span>
@@ -1004,6 +1004,17 @@ async function leerCarpeta(files, onProg) {
               (res.encontradas.length === mejor.encontradas.length && res.registros.length > mejor.registros.length)) mejor = res;
         }
         regs = mejor.registros;
+        if (t === 'SALIDA' && wb.SheetNames.length > 1) {
+          const hojas = [];
+          regs = [];
+          for (const n of wb.SheetNames) {
+            const res = matrizARegistros(hojaAMatriz(wb.Sheets[n]), t);
+            if (res.faltan.length || !res.registros.length) continue;
+            res.registros.forEach(x => { x._h = n; regs.push(x); }); hojas.push(n + ' (' + nf0p(res.registros.length) + ')');
+          }
+          if (!regs.length) regs = mejor.registros;
+          else if (hojas.length > 1) avisos.push('Se leyeron ' + hojas.length + ' hojas: ' + hojas.join(', '));
+        }
         info.columnas = mejor.columnas;
         if (mejor.rellenadas) avisos.push(nf0p(mejor.rellenadas) + ' filas sin fecha/planilla se completaron con la fila de arriba (reporte agrupado)');
         if (mejor.faltan.length) avisos.push('Faltan columnas: ' + mejor.faltan.map(c => (DATOS_LBL[t === 'NEXUS' || t === 'SIC' ? 'MOD' : t] || {})[c] || c).join(', '));
@@ -1016,7 +1027,7 @@ async function leerCarpeta(files, onProg) {
         const k = claveRepetida(t, regs[j]);
         if (k !== null && prev.has(k)) { repetidas++; continue; }
         if (k !== null) propias.push(k);
-        if (t === 'SALIDA') regs[j]._a = f.name;
+        if (t === 'SALIDA') regs[j]._a = f.name + (regs[j]._h ? ' · ' + regs[j]._h : '');
         dest.push(regs[j]);
       }
       for (let j = 0; j < propias.length; j++) prev.add(propias[j]);
@@ -1226,36 +1237,46 @@ function olExcluido(ol, f) {
 /* ---------- cruces y cálculo ---------- */
 /* Detecta si una columna de fechas viene como día/mes o mes/día (formato de EE.UU.)
    y deja todas las fechas como aaaa-mm-dd. Cuenta las que no se pudieron leer. */
-function normalizarFechas(lista, campos, origen, D) {
+function normalizarFechas(lista, campos, origen, D, rangoRef) {
   for (const c of campos) {
-    let dmy = 0, mdy = 0;
-    const paso = Math.max(1, Math.floor(lista.length / 3000));
+    /* El orden día/mes se decide por archivo: un archivo pegado como texto en formato mes/día no cambia a los demás */
+    const votos = new Map(), voto = r => { const k = r._a || ''; let o = votos.get(k); if (!o) { o = [0, 0]; votos.set(k, o); } return o; };
+    const paso = Math.max(1, Math.floor(lista.length / 6000));
     for (let i = 0; i < lista.length; i += paso) {
       const v = lista[i][c]; if (typeof v !== 'string') continue;
       const m = v.trim().match(/^(\d{1,2})[-\/. ]+(\d{1,2})[-\/. ]+\d{2,4}/); if (!m) continue;
       const a = +m[1], b = +m[2];
-      if (a > 12 && b <= 12) dmy++; else if (b > 12 && a <= 12) mdy++;
+      if (a > 12 && b <= 12) voto(lista[i])[0]++; else if (b > 12 && a <= 12) voto(lista[i])[1]++;
     }
-    const orden = mdy > dmy ? 'mdy' : 'dmy';
+    let tD = 0, tM = 0; for (const [dd, mm] of votos.values()) { tD += dd; tM += mm; }
+    const ordenGral = tM > tD ? 'mdy' : 'dmy';
+    const ordenDe = r => { const o = votos.get(r._a || ''); return o && (o[0] || o[1]) ? (o[1] > o[0] ? 'mdy' : 'dmy') : ordenGral; };
+    const fueraRango = f => rangoRef && rangoRef.min && f && (f < addDiasP(rangoRef.min, -20) || f > addDiasP(rangoRef.max, 20));
+    /* Con planilla: la fecha es "buena" si RCH tiene esa planilla ese día (±3 días); si RCH no tiene la planilla, se mira el rango general */
+    const lejos = (f, r) => { const fs = rangoRef && rangoRef.porPlan && rangoRef.porPlan.get(llaveP(r.planilla)); if (fs) { for (const x of fs) if (x >= addDiasP(f, -3) && x <= addDiasP(f, 3)) return false; return true; } return fueraRango(f); };
     let malas = 0, hay = false; const pat = new Map();
     for (const r of lista) {
       if (!(c in r)) continue; hay = true;
       const v = r[c]; if ((v === '' || v == null) && !r._f2) continue;
+      const orden = ordenDe(r);
       let f = fechaTexto(v, orden);
+      if (f && typeof v === 'string' && rangoRef && lejos(f, r)) { const alt = fechaTexto(v, orden === 'mdy' ? 'dmy' : 'mdy'); if (alt && alt !== f && !lejos(alt, r)) { f = alt; D.fechaDadaVuelta = (D.fechaDadaVuelta || 0) + 1; D.fechaDadaVueltaOrigen = origen; } }
       if (!f && r._f2 && (c === 'fecha' || c === 'fent' || c === 'fpunt')) for (const w of r._f2) { f = fechaTexto(w, orden); if (f) { D.respaldo = (D.respaldo || 0) + 1; break; } }
       if (!f) { malas++; const k = patron(v); pat.set(k, (pat.get(k) || 0) + 1); }
       if (origen === 'NEXUS' || origen === 'SIC' || origen === 'RCH') r['_raw_' + c] = v;
       r[c] = f;
     }
-    if (hay) D.fechas.push({ origen, campo: c, orden, malas, pat: [...pat.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(x => x[0]) });
+    if (hay) D.fechas.push({ origen, campo: c, orden: ordenGral, malas, pat: [...pat.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(x => x[0]) });
   }
 }
 
+const addDiasP = (f, n) => { const d = new Date(f + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 function procesar(raw) {
   _mapOL.clear();
   const DF = { fechas: [] };
-  normalizarFechas(raw.SALIDA, ['fecha'], 'SALIDA', DF);
   normalizarFechas(raw.RCH, ['fecha'], 'RCH', DF);
+  /* SALIDA después de RCH: las fechas ambiguas (día y mes de 1 a 12) se validan contra el rango de fechas de RCH */
+  { const rr = { min: '', max: '', porPlan: new Map() }; for (const r of raw.RCH) { const f = r.fecha; if (f && /^\d{4}-/.test(f)) { if (!rr.min || f < rr.min) rr.min = f; if (!rr.max || f > rr.max) rr.max = f; const p0 = llaveP(r.planilla); if (p0) { let st = rr.porPlan.get(p0); if (!st) { st = new Set(); rr.porPlan.set(p0, st); } st.add(f); } } } normalizarFechas(raw.SALIDA, ['fecha'], 'SALIDA', DF, rr); }
   normalizarFechas(raw.NEXUS, ['fecha'], 'NEXUS', DF);
   normalizarFechas(raw.SIC, ['fecha'], 'SIC', DF);
   normalizarFechas(raw.RMD, ['fpunt', 'fent', 'fecha'], 'RMD', DF);
@@ -1292,12 +1313,13 @@ function procesar(raw) {
   /* RCH: una fila por cliente dentro de cada planilla */
   const rch = [];
   const rango = (r, f) => { if (!f) return; if (!r.min || f < r.min) r.min = f; if (!r.max || f > r.max) r.max = f; };
-  const D = { fechas: DF.fechas, rRch: {}, rRchSin: {}, rSal: {}, sinSalMes: {}, rchLeidas: raw.RCH.length, rchSinMov: 0, rchSinFecha: 0, rchSinSalida: 0, rchOk: 0,
+  const D = { fechas: DF.fechas, fechaDadaVuelta: DF.fechaDadaVuelta || 0, rRch: {}, rRchSin: {}, rSal: {}, sinSalMes: {}, rchLeidas: raw.RCH.length, rchSinMov: 0, rchSinFecha: 0, rchSinSalida: 0, rchOk: 0,
     pat: { salPlanilla: patrones(raw.SALIDA, 'planilla'), rchPlanilla: patrones(raw.RCH, 'planilla'), rchFecha: patrones(raw.RCH, 'fecha'),
       rchCliente: patrones(raw.RCH, 'cliente'), modCliente: patrones(raw.NEXUS.concat(raw.SIC.slice(0, 50)), 'cliente'), modFecha: patrones(raw.NEXUS.concat(raw.SIC.slice(0, 50)), 'fecha'),
       rmdFecha: patrones(raw.RMD, 'fpunt'), rmdPlanilla: patrones(raw.RMD, 'planilla'), cjPed: patrones(raw.RCH, 'cjPed') } };
   Object.assign(D, MS);
   for (const r of raw.SALIDA) rango(D.rSal, fechaTexto(r.fecha));
+  D.salMes = {}; for (const r of raw.SALIDA) { if (!llaveP(r.planilla)) continue; const f = fechaTexto(r.fecha), k = f ? f.slice(0, 7) : 'sin fecha', o = D.salMes[k] || (D.salMes[k] = [0, 0, 0]); o[0]++; if (llave(r.dni)) o[1]++; if (String(r.chofer || '').trim()) o[2]++; }
   /* OL desde otras bases (BEES): por planilla, o por fecha + cliente, para planillas que no están en SALIDA */
   const olPlanB = new Map(), olFCB = new Map(); D.olColBases = [];
   D.beesDia = {};
@@ -2546,6 +2568,7 @@ function renderDiagnostico() {
       <tr><td class="l">… sin pedido ni rechazo (no cuentan)</td><td class="num">${n(D.rchSinMov)}</td><td class="l">Cj Ped ${lista(D.pat.cjPed)}</td></tr>
       <tr><td class="l">… sin fecha válida</td><td class="num">${n(D.rchSinFecha)}</td><td></td></tr>
       <tr><td class="l">… con planilla que no está en SALIDA</td><td class="num">${n(D.rchSinSalida)}</td><td class="l" style="white-space:normal">${D.rchSinSalida ? `Son de fechas del ${rg(D.rRchSin)} (${meses}). SALIDA cubre del ${rg(D.rSal)}; RCH, del ${rg(D.rRch)}.` : ''}</td></tr>
+      <tr><td class="l">SALIDA por mes (planillas · con DNI · con chofer)</td><td class="num">${n(Object.values(D.salMes || {}).reduce((q, o) => q + o[0], 0))}</td><td class="l" style="white-space:normal">${Object.entries(D.salMes || {}).sort().map(([m, o]) => (m === 'sin fecha' ? '<b style="color:var(--bad)">sin fecha</b>' : nomMes(m)) + ': ' + n(o[0]) + ' · ' + n(o[1]) + ' · ' + n(o[2])).join(' — ')}${D.fechaDadaVuelta ? ` <br>${n(D.fechaDadaVuelta)} fechas de SALIDA venían como mes/día y se leyeron al revés (validadas con las fechas de RCH).` : ''}</td></tr>
       <tr><td class="l">… de ${esc((D.olExcluidos || []).join(', ') || 'OL dados de baja')} (suman al total, no se muestran como OL)</td><td class="num">${n(D.excluidas)}</td><td class="l">Se configuran en la hoja "OL excluidos"</td></tr>
       <tr><td class="l">Filas de RCH de Aguanor (OL que no es propio o sin OL): suman al total, no se muestran como OL</td><td class="num">${n(D.agRch)}</td><td class="l" style="white-space:normal">OL oficiales: ${esc((D.olOficiales || []).join(', ') || '(lista vacía: no se agrupa)')}. Solo se muestran estos OL. Cualquier otro, o una planilla que no está en SALIDA ni en BEES, es Aguanor: suma al total pero no se muestra. Se configura en la hoja "OL oficiales".</td></tr>
       <tr><td class="l"><b>Filas de RCH asignadas a un chofer</b></td><td class="num"><b>${n(D.rchOk)}</b>${pct(D.rchOk, conMov)}</td><td></td></tr>
@@ -3045,7 +3068,7 @@ const CAMP_HTML = "<!doctype html>\n<html lang=\"es\">\n<head>\n<meta charset=\"
    - Si el navegador no permite recordar carpetas, usa el selector clásico.
    ===================================================================== */
 (function () {
-  const VERSION_TABLERO = '2026-11-03 16:45';
+  const VERSION_TABLERO = '2026-11-03 18:35';
   const g = id => document.getElementById(id);
   function mensaje(t, error) { const m = g('msg'); m.textContent = t; m.className = error ? 'err' : ''; }
   const hora = d => d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
