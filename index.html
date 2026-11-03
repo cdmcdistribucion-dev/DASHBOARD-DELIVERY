@@ -224,7 +224,7 @@ html{scroll-behavior:smooth}
 <header class="topbar">
   <div class="brand">
     <h1>DASHBOARD DISTRI</h1>
-    <small>KPIs de choferes y operadores logísticos · versión 2026-11-03 16:30</small>
+    <small>KPIs de choferes y operadores logísticos · versión 2026-11-03 16:45</small>
   </div>
   <div class="fresh">
     <span id="freshText"><span class="dot off"></span>Sin datos cargados</span>
@@ -358,7 +358,7 @@ html{scroll-behavior:smooth}
       <h2>Clientes</h2>
       <div class="toolbar" style="margin:6px 0 10px">
         <div class="seg" role="group" aria-label="Clientes" id="segRmdCli"><button data-c="det" aria-pressed="true">Solo detractores</button><button data-c="pas">Pasivos</button><button data-c="pro">Promotores</button><button data-c="">Todos</button></div>
-        <input id="inRmdCli" placeholder="Buscar cliente, OL o chofer" style="min-width:240px">
+        <input id="inRmdCli" placeholder="Buscar cliente, razón social, dirección, OL o chofer" style="min-width:320px">
         <button class="btn" id="btnRmdCli">⬇ Descargar clientes</button>
         <button class="btn" id="btnRmdDet">⬇ Descargar calificaciones</button>
       </div>
@@ -602,7 +602,10 @@ const ALIAS_DEF = {
     olRch: ['ol', 'operadorlogistico', 'dtransportista', 'transportista', 'dtransporte', 'transporte', 'dfletero', 'fletero', 'empresatransporte', 'codtransportista', 'codtransporte'],
     socFl: ['dsocfletero', 'socfletero', 'sociedadfletero', 'razonsocialfletero', 'dfletero'],
     flD: ['dfletero', 'fletero'],
-    pal: ['pavtabrutasum', 'pavtabruta', 'pavta', 'paletasvta', 'paletasvtabruta', 'paletasvendidas', 'paletas', 'pallets', 'palets', 'pallet', 'paleta']
+    pal: ['pavtabrutasum', 'pavtabruta', 'pavta', 'paletasvta', 'paletasvtabruta', 'paletasvendidas', 'paletas', 'pallets', 'palets', 'pallet', 'paleta'],
+    cliRs: ['razonsocial', 'razonsocialcliente', 'dcli', 'dcliente', 'dclie', 'descliente', 'desccliente', 'descripcioncliente', 'nombrecliente', 'nombredelcliente', 'nomcliente', 'nomcli', 'nombrefantasia'],
+    cliDir: ['direccion', 'direccioncliente', 'domicilio', 'domiciliocliente', 'ddomicilio', 'ddireccion', 'direccionentrega', 'domicilioentrega', 'calleynumero', 'calle', 'dcalle'],
+    cliLoc: ['localidad', 'dlocalidad', 'localidadcliente', 'ciudad', 'partido', 'dpartido']
   },
   MOD: {
     fecha: ['fecha', 'fechaentrega', 'fechamodulacion', 'fechadeentrega'],
@@ -652,7 +655,7 @@ let ALIAS = JSON.parse(JSON.stringify(ALIAS_DEF));
 const DATOS_LBL = {
   SALIDA: { fecha: 'Fecha', planilla: 'Planilla', chofer: 'Chofer', dni: 'DNI', ol: 'OL' },
   RCH: { fecha: 'Fecha', planilla: 'Planilla', cliente: 'Cliente', seg: 'Segmento', cjPed: 'Cajas pedidas', hlPed: 'HL pedidos',
-    cjRch: 'Cajas rechazadas', hlRch: 'HL rechazados', cjVta: 'Cajas venta bruta', hlVta: 'HL venta bruta', cntPed: 'Pedidos', cModTot: 'Mod Tot', cModEnt: 'Mod Entregadas', cModER: 'Mod Ent + Rch Tot', cModUni: 'Modulacion Unificada', cModSic: 'Modulacion SIC', olRch: 'OL', socFl: 'Soc. fletero', flD: 'D.Fletero', pal: 'Paletas', motRch: 'Motivo rechazo' },
+    cjRch: 'Cajas rechazadas', hlRch: 'HL rechazados', cjVta: 'Cajas venta bruta', hlVta: 'HL venta bruta', cntPed: 'Pedidos', cModTot: 'Mod Tot', cModEnt: 'Mod Entregadas', cModER: 'Mod Ent + Rch Tot', cModUni: 'Modulacion Unificada', cModSic: 'Modulacion SIC', olRch: 'OL', socFl: 'Soc. fletero', flD: 'D.Fletero', pal: 'Paletas', motRch: 'Motivo rechazo', cliRs: 'Razón social', cliDir: 'Dirección', cliLoc: 'Localidad' },
   MOD: { fecha: 'Fecha', cliente: 'Cliente', motivo: 'Motivo' },
   RMD: { fpunt: 'Fecha puntuacion', fent: 'Fecha entrega', fecha: 'Fecha', planilla: 'Planilla', cliente: 'Cliente', puntaje: 'Puntaje', coment: 'Comentario' },
   '450': { fecha: 'Fecha', planilla: 'Planilla', patente: 'Patente', kilos: 'Peso facturado', pallets: 'Pallets facturados', pctPal: '% Plt', capKg: 'Cap max de peso', ol: 'OL' },
@@ -758,7 +761,7 @@ function matrizARegistros(mat, tipo) {
   for (let i = 0; i < lim; i++) {
     const enc = (mat[i] || []).map(norm);
     const m = {}; let pts = 0;
-    for (const c of campos) { const j = columnaDe(enc, alias[c], (EXACTO[tipo] || []).includes(c)); m[c] = j; if (j >= 0) pts++; }
+    for (const c of campos) { let j = columnaDe(enc, alias[c], (EXACTO[tipo] || []).includes(c)); if (j >= 0 && /^cli(Rs|Dir|Loc)$/.test(c) && /fletero|transp|chofer|sucursal|deposito|centro/.test(enc[j])) j = -1; m[c] = j; if (j >= 0 && !/^cli(Rs|Dir|Loc)$/.test(c)) pts++; }
     if (pts > mejorPuntos) { mejorPuntos = pts; mejor = i; mapa = m; }
   }
   if (mejor < 0) return { registros: [], encontradas: [], faltan: reqDe(tipo) };
@@ -1657,6 +1660,16 @@ function procesar(raw) {
   }
   if (calcRchMod) calcRchMod();
 
+  /* Razón social, dirección y localidad de cada cliente, tomadas de la bajada de RCH (la última fila con dato) */
+  const cliInfo = new Map();
+  for (const r of raw.RCH) {
+    if (r.cliRs === undefined && r.cliDir === undefined && r.cliLoc === undefined) continue;
+    const c = cliN(r.cliente); if (!c) continue;
+    const t = v => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+    const o = cliInfo.get(c) || ['', '', ''], rs = t(r.cliRs), di = t(r.cliDir), lo = t(r.cliLoc);
+    if (rs) o[0] = rs; if (di) o[1] = di; if (lo) o[2] = lo; cliInfo.set(c, o);
+  }
+
   /* Rate My Delivery: asignación de planilla (pasos 1 a 6) */
   const rmd = [];
   const rmdSinPlan = [];   /* calificaciones sin planilla: suman al RMD total, sin OL ni chofer */
@@ -1806,6 +1819,8 @@ const planGrupo = new Map();
   const rmdDet = [];
   for (const x of rmd) { const o = mapOL(x.ol); if (o.ol === AGUANOR) continue; rmdDet.push([x.f, x.p || '', x.c || '', o.ol, x.canal || '', x.dni || '', x.pt, x.com || '']); }
   for (const x of rmdSinPlan) rmdDet.push([x.f, '', x.c || '', SINPLAN, '', '', x.pt, x.com || '']);
+  const rmdCli = {}; for (const x of rmdDet) { const i = cliInfo.get(x[2]); if (i && !rmdCli[x[2]]) rmdCli[x[2]] = i; }
+  D.cliInfo = { conDato: cliInfo.size };
 
   /* ---------- Refacturaciones: 3 30 8 (clientes atendidos por planilla) × Chat Tonic (refacturado + motivo) ----------
      Como el Excel: clave planilla + cliente; Refacturó = columna "Hubo refacturación" (o "Refacturado") de Chat Tonic (si no está: NO);
@@ -2120,7 +2135,7 @@ const planGrupo = new Map();
     detalle: rch.map(x => [x.f, x.planilla, x.cliente, mapOL(x.ol).ol === AGUANOR ? OL_OCULTO : mapOL(x.ol).ol, x.canal, x.S, x.V, x.X, x.pedRch, x.mod || '-', x.modTot, x.modEnt, x.modEntORch, x.hlRch, x.motRch, mapOL(x.ol).ol === AGUANOR ? '' : x.dni, x.conRch, x.chofer || '', x.olNO ? mapOL(x.olNO).ol : '', x.hlVta, x.olNOf || '', x.ped, mapOL(x.ol).ol === AGUANOR ? 1 : 0, x.olOfi ? (x.olOfi === OL_OCULTO ? OL_OCULTO : mapOL(x.olOfi).ol) : 'Aguanor', x.olOfiF, x.cand || null]),
     modoMod: CONFIG.modoMod,
     ajustes: { claveFiltro: CONFIG.claveFiltro, filtroInicial: CONFIG.filtroInicial, appComentarios: CONFIG.appComentarios || '' },
-    refacDet, refacNoDet, rmdDet, rmdUmbral: CONFIG.rmdDetractor,
+    refacDet, refacNoDet, rmdDet, rmdCli, rmdUmbral: CONFIG.rmdDetractor,
     modoViajes: CONFIG.modoViajes, olOculto: OL_OCULTO, olNoListar: [OL_OCULTO, SINPLAN, 'Sin OL'],
     filas, choferes, ols, kpis, campos: CAMPOS_NUCLEO.concat(camposExtra), config: raw.config,
     lectura: { fecha: new Date().toISOString(), archivos },
@@ -2791,25 +2806,27 @@ function renderRmd() {
   document.querySelectorAll('#tblRmdOL tr[data-ol]').forEach(tr => tr.onclick = () => { S.ol = S.ol === tr.dataset.ol ? '' : tr.dataset.ol; syncFiltros(); render(); });
   /* clientes */
   document.querySelectorAll('#segRmdCli button').forEach(b => { b.setAttribute('aria-pressed', b.dataset.c === RMD_CLI); b.onclick = () => { RMD_CLI = b.dataset.c; renderRmd(); }; });
+  const CI = DATA.rmdCli || {}, info = c => CI[c] || ['', '', ''], dirTxt = i => [i[1], i[2]].filter(Boolean).join(', ');
   const gc = agrupar(det, x => x[2] || '(sin código)');
   let rc = [...gc.entries()].map(([c, rs]) => { const o = cuenta(rs); rs = rs.slice().sort((a, b) => a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0);
     const ols = [...new Set(rs.map(x => x[3]))], chs = [...new Set(rs.filter(x => x[5]).map(x => nombreChofer(x[5])))], coms = rs.filter(x => x[7]).map(x => fCorta(x[0]) + ': ' + x[7]);
-    return Object.assign(o, { c, ols, chs, ult: rs[0][0], notas: rs.map(x => x[6]), coms, rs, tipo: tipo(o.prom) }); });
+    const i = info(c); return Object.assign(o, { c, rs_: i[0], dir: i[1], loc: i[2], ols, chs, ult: rs[0][0], notas: rs.map(x => x[6]), coms, rs, tipo: tipo(o.prom) }); });
   const total = rc.length;
   if (RMD_CLI === 'det') rc = rc.filter(x => x.det > 0);
   else if (RMD_CLI) rc = rc.filter(x => x.tipo === RMD_CLI);
   const q = String($('inRmdCli').value || '').trim().toLowerCase();
-  if (q) rc = rc.filter(x => x.c.toLowerCase().includes(q) || x.ols.join(' ').toLowerCase().includes(q) || x.chs.join(' ').toLowerCase().includes(q));
+  if (q) rc = rc.filter(x => x.c.toLowerCase().includes(q) || (x.rs_ + ' ' + x.dir + ' ' + x.loc).toLowerCase().includes(q) || x.ols.join(' ').toLowerCase().includes(q) || x.chs.join(' ').toLowerCase().includes(q));
   rc.sort((a, b) => RMD_CLI === 'pro' ? b.prom - a.prom || b.n - a.n : b.det - a.det || a.prom - b.prom || b.n - a.n);
   const tipoTxt = { det: 'Detractor', pas: 'Pasivo', pro: 'Promotor' };
   $('rmdCliSub').textContent = (RMD_CLI === 'det' ? `Clientes con al menos una calificación de ${U} o menos: ` : RMD_CLI ? `Clientes ${tipoTxt[RMD_CLI].toLowerCase()}es (por su promedio): ` : 'Todos los clientes calificados: ') + nf0.format(rc.length) + ' de ' + nf0.format(total) + ' clientes.' + (rc.length > 500 ? ' Se muestran los primeros 500; la descarga trae todos.' : '');
-  $('tblRmdCli').innerHTML = `<thead><tr><th class="l">Cliente</th><th class="l">Operador logístico</th><th class="l">Chofer</th><th>Calificaciones</th><th>Promedio</th><th>Detractoras</th><th class="l">Puntajes (último primero)</th><th>Última</th><th class="l">Comentarios</th></tr></thead><tbody>${rc.slice(0, 500).map(x => `<tr><td class="l"><b>${esc(x.c)}</b></td><td class="l">${esc(x.ols.join(', '))}</td><td class="l">${esc(x.chs.join(', ') || '—')}</td><td class="num">${nf0.format(x.n)}</td><td class="num"><b style="color:${x.tipo === 'det' ? 'var(--bad)' : x.tipo === 'pro' ? 'var(--ok)' : 'inherit'}">${nf2.format(x.prom)}</b></td><td class="num">${x.det ? `<b style="color:var(--bad)">${nf0.format(x.det)}</b>` : '0'}</td><td class="l">${x.notas.slice(0, 12).map(v => `<span style="display:inline-block;min-width:18px;text-align:center;margin-right:2px;border-radius:4px;padding:0 3px;${v <= U ? 'background:var(--bad);color:#fff' : v >= 4 ? 'background:var(--ok);color:#fff' : 'background:var(--line)'}">${nf0.format(v)}</span>`).join('')}${x.notas.length > 12 ? ' …' : ''}</td><td class="num">${fCorta(x.ult)}</td><td class="l" style="white-space:normal;max-width:360px;font-size:12px">${esc(x.coms.slice(0, 3).join(' · '))}${x.coms.length > 3 ? ' …' : ''}</td></tr>`).join('') || '<tr><td colspan="9" class="empty">No hay clientes con ese filtro en el período.</td></tr>'}</tbody>`;
+  $('tblRmdCli').innerHTML = `<thead><tr><th class="l">Cliente</th><th class="l">Razón social</th><th class="l">Dirección</th><th class="l">Operador logístico</th><th class="l">Chofer</th><th>Calificaciones</th><th>Promedio</th><th>Detractoras</th><th class="l">Puntajes (último primero)</th><th>Última</th><th class="l">Comentarios</th></tr></thead><tbody>${rc.slice(0, 500).map(x => `<tr><td class="l"><b>${esc(x.c)}</b></td><td class="l" style="white-space:normal;min-width:160px">${esc(x.rs_ || '—')}</td><td class="l" style="white-space:normal;min-width:180px;font-size:12px">${esc(dirTxt([x.rs_, x.dir, x.loc]) || '—')}</td><td class="l">${esc(x.ols.join(', '))}</td><td class="l">${esc(x.chs.join(', ') || '—')}</td><td class="num">${nf0.format(x.n)}</td><td class="num"><b style="color:${x.tipo === 'det' ? 'var(--bad)' : x.tipo === 'pro' ? 'var(--ok)' : 'inherit'}">${nf2.format(x.prom)}</b></td><td class="num">${x.det ? `<b style="color:var(--bad)">${nf0.format(x.det)}</b>` : '0'}</td><td class="l">${x.notas.slice(0, 12).map(v => `<span style="display:inline-block;min-width:18px;text-align:center;margin-right:2px;border-radius:4px;padding:0 3px;${v <= U ? 'background:var(--bad);color:#fff' : v >= 4 ? 'background:var(--ok);color:#fff' : 'background:var(--line)'}">${nf0.format(v)}</span>`).join('')}${x.notas.length > 12 ? ' …' : ''}</td><td class="num">${fCorta(x.ult)}</td><td class="l" style="white-space:normal;max-width:360px;font-size:12px">${esc(x.coms.slice(0, 3).join(' · '))}${x.coms.length > 3 ? ' …' : ''}</td></tr>`).join('') || '<tr><td colspan="11" class="empty">No hay clientes con ese filtro en el período.</td></tr>'}</tbody>`;
+  if (!Object.keys(CI).length && det.length) $('rmdCliSub').textContent += ' La bajada de RCH no trae razón social ni dirección (o tienen otro nombre de columna): se puede indicar en la hoja Columnas de la configuración.';
   $('inRmdCli').oninput = () => renderRmd();
   const sufijo = r.desde + '_al_' + r.hasta + (S.ol ? '_' + S.ol.replace(/\W+/g, '_') : '');
-  $('btnRmdCli').onclick = () => descargarCSV('rmd_clientes_' + (RMD_CLI || 'todos') + '_' + sufijo + '.csv', [['Cliente', 'Operador logístico', 'Chofer', 'Calificaciones', 'Promedio', 'Detractoras (' + U + ' o menos)', 'Pasivas', 'Promotoras (4 o 5)', 'Tipo por promedio', 'Puntajes (último primero)', 'Última calificación', 'Comentarios']]
-    .concat(rc.map(x => [x.c, x.ols.join(', '), x.chs.join(', '), x.n, Math.round(x.prom * 100) / 100, x.det, x.pas, x.pro, tipoTxt[x.tipo], x.notas.join(' '), fLarga(x.ult), x.coms.join(' | ')])));
-  $('btnRmdDet').onclick = () => descargarCSV('rmd_calificaciones_' + sufijo + '.csv', [['Fecha', 'Planilla', 'Cliente', 'Operador logístico', 'Canal', 'Chofer', 'DNI', 'Puntaje', 'Tipo', 'Comentario']]
-    .concat(det.slice().sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[6] - b[6]).map(x => [fLarga(x[0]), x[1], x[2], x[3], x[4], x[5] ? nombreChofer(x[5]) : '', x[5], x[6], tipoTxt[tipo(x[6])], x[7]])));
+  $('btnRmdCli').onclick = () => descargarCSV('rmd_clientes_' + (RMD_CLI || 'todos') + '_' + sufijo + '.csv', [['Cliente', 'Razón social', 'Dirección', 'Localidad', 'Operador logístico', 'Chofer', 'Calificaciones', 'Promedio', 'Detractoras (' + U + ' o menos)', 'Pasivas', 'Promotoras (4 o 5)', 'Tipo por promedio', 'Puntajes (último primero)', 'Última calificación', 'Comentarios']]
+    .concat(rc.map(x => [x.c, x.rs_, x.dir, x.loc, x.ols.join(', '), x.chs.join(', '), x.n, Math.round(x.prom * 100) / 100, x.det, x.pas, x.pro, tipoTxt[x.tipo], x.notas.join(' '), fLarga(x.ult), x.coms.join(' | ')])));
+  $('btnRmdDet').onclick = () => descargarCSV('rmd_calificaciones_' + sufijo + '.csv', [['Fecha', 'Planilla', 'Cliente', 'Razón social', 'Dirección', 'Localidad', 'Operador logístico', 'Canal', 'Chofer', 'DNI', 'Puntaje', 'Tipo', 'Comentario']]
+    .concat(det.slice().sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[6] - b[6]).map(x => { const i = info(x[2]); return [fLarga(x[0]), x[1], x[2], i[0], i[1], i[2], x[3], x[4], x[5] ? nombreChofer(x[5]) : '', x[5], x[6], tipoTxt[tipo(x[6])], x[7]]; })));
 }
 
 function consultarCliente() {
@@ -3028,7 +3045,7 @@ const CAMP_HTML = "<!doctype html>\n<html lang=\"es\">\n<head>\n<meta charset=\"
    - Si el navegador no permite recordar carpetas, usa el selector clásico.
    ===================================================================== */
 (function () {
-  const VERSION_TABLERO = '2026-11-03 16:30';
+  const VERSION_TABLERO = '2026-11-03 16:45';
   const g = id => document.getElementById(id);
   function mensaje(t, error) { const m = g('msg'); m.textContent = t; m.className = error ? 'err' : ''; }
   const hora = d => d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
