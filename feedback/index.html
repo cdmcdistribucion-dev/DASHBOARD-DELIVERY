@@ -154,8 +154,10 @@ td.sel{background:#fff8dc;font-weight:700}
   var PAL = ['#1f3a8a', '#f5b800', '#1f9a8a', '#9a3b8a', '#d9622b', '#5f5f66', '#2e7bd6', '#8a6d1f'];
   var MESES = []; R.forEach(function (x) { var m = x[0].slice(0, 7); if (MESES.indexOf(m) < 0) MESES.push(m); }); MESES.sort();
   var OLS = []; R.forEach(function (x) { if (x[4] !== 'Sin OL' && OLS.indexOf(x[4]) < 0) OLS.push(x[4]); }); OLS.sort(function (a, b) { return a.localeCompare(b, 'es'); });
-  if (R.some(function (x) { return x[4] === 'Sin OL'; })) OLS.push('Sin OL');
-  var COL = {}; OLS.forEach(function (o, i) { COL[o] = o === 'Sin OL' ? '#b9b9bf' : PAL[i % PAL.length]; });
+  if (R.some(function (x) { return x[4] === 'Sin OL'; })) OLS.push('Sin OL');   /* feedbacks sin OL identificado: se muestran para no perder ninguno */
+  /* Colores fijos por OL: TOL (Online) rojo · Levon celeste · Río de las Vueltas azul · Special Truck verde */
+  var colorFijo = function (o) { var t = String(o).toLowerCase(); return /online|^tol\b/.test(t) ? '#d32f2f' : /levon|^tl\b/.test(t) ? '#29b6f6' : /rio de las vueltas|r[ií]o|^rdv\b/.test(t) ? '#1f3a8a' : /special|^st\b/.test(t) ? '#2e9d4a' : ''; };
+  var COL = {}, ip = 0; OLS.forEach(function (o) { COL[o] = o === 'Sin OL' ? '#b9b9bf' : colorFijo(o) || PAL[(4 + ip++) % PAL.length]; });
   var st = { mes: MESES[MESES.length - 1], ol: '', crit: '', q: '' };
   $('al').textContent = 'Datos al ' + D.dataAl;
   $('selMes').innerHTML = '<option value="">Todos los meses</option>' + MESES.slice().reverse().map(function (m) { return '<option value="' + m + '">' + mesLbl(m) + '</option>'; }).join('');
