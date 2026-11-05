@@ -224,7 +224,7 @@ html{scroll-behavior:smooth}
 <header class="topbar">
   <div class="brand">
     <h1>DASHBOARD DISTRI</h1>
-    <small>KPIs de choferes y operadores logísticos · versión 2026-11-05 15:15</small>
+    <small>KPIs de choferes y operadores logísticos · versión 2026-11-05 15:45</small>
   </div>
   <div class="fresh">
     <span id="freshText"><span class="dot off"></span>Sin datos cargados</span>
@@ -2204,6 +2204,14 @@ const planGrupo = new Map();
   const conDatos = new Set(filas.map(x => x.dni));
   for (const s of sal.values()) if (s.dni && conDatos.has(s.dni) && !olExcluido(s.ol, '') && !choferes[s.dni]) choferes[s.dni] = { dni: s.dni, nombre: s.chofer || s.dni, ol: mapOL(s.ol).ol };
   for (const s of sal.values()) if (s.dni && conDatos.has(s.dni) && !choferes[s.dni]) choferes[s.dni] = { dni: s.dni, nombre: s.chofer || s.dni, ol: mapOL(s.ol).ol };
+  /* OL del chofer: el que más se repite en sus planillas de SALIDA (si en SALIDA figura un OL no oficial, se usa el OL de esa planilla en BEES).
+     Así un chofer de un OL propio no queda como Aguanor por una planilla suelta o por un nombre de OL distinto en SALIDA. */
+  { const cnt = new Map();
+    for (const [k, s0] of salPF) { if (!s0.dni || !choferes[s0.dni]) continue; const f = k.slice(0, 10), p = k.slice(11);
+      let o = mapOL(s0.ol).ol; if (o === AGUANOR) { const b = olBeesPlan(p, f); if (b) o = mapOL(b).ol; } if (o === AGUANOR || olExcluido(o, f)) continue;
+      let m = cnt.get(s0.dni); if (!m) cnt.set(s0.dni, m = new Map()); const x = m.get(o) || [0, '']; x[0]++; if (f > x[1]) x[1] = f; m.set(o, x); }
+    D.choferOlCorr = 0;
+    for (const [dni, m] of cnt) { const best = [...m.entries()].sort((a, b) => b[1][0] - a[1][0] || (b[1][1] > a[1][1] ? 1 : -1))[0]; if (best && choferes[dni].ol !== best[0]) { if (choferes[dni].ol === AGUANOR) D.choferOlCorr++; choferes[dni].ol = best[0]; } } }
   const ols = [...new Set(filas.map(x => x.ol).filter(o => o !== OL_OCULTO && o !== SINPLAN && o !== 'Sin OL'))].sort((a, b) => a.localeCompare(b, 'es'));
 
   const archivos = raw.archivos.map(a => ({
@@ -3172,7 +3180,7 @@ const FEED_HTML = "<!doctype html>\n<html lang=\"es\">\n<head>\n<meta charset=\"
    - Si el navegador no permite recordar carpetas, usa el selector clásico.
    ===================================================================== */
 (function () {
-  const VERSION_TABLERO = '2026-11-05 15:15';
+  const VERSION_TABLERO = '2026-11-05 15:45';
   const g = id => document.getElementById(id);
   function mensaje(t, error) { const m = g('msg'); m.textContent = t; m.className = error ? 'err' : ''; }
   const hora = d => d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -3326,16 +3334,19 @@ const FEED_HTML = "<!doctype html>\n<html lang=\"es\">\n<head>\n<meta charset=\"
       const add = async (tipo, id, label, min) => {
         S.per = tipo; S.pick = id;
         const f = [];
-        for (const x of filasChoferes()) { const h = await H(x.dni); if (!nombres[h]) nombres[h] = [x.nombre, x.ol]; f.push([h, x.nombre, x.ol, x.viajes, kp.map(k => x[k.id] == null || !isFinite(x[k.id]) ? null : Math.round(x[k.id] * 1e6) / 1e6)]); }
+        for (const x of filasChoferes()) { if (/^aguanor$/i.test(String(x.ol || '').trim())) continue;   /* Aguanor no se muestra en la app */
+          const h = await H(x.dni); if (!nombres[h]) nombres[h] = [x.nombre, x.ol]; f.push([h, x.nombre, x.ol, x.viajes, kp.map(k => x[k.id] == null || !isFinite(x[k.id]) ? null : Math.round(x[k.id] * 1e6) / 1e6)]); }
         periodos.push({ tipo, id, label, min, f });
       };
-      for (const m of MESES_DISP.slice(-3).reverse()) await add('mes', m, nomMes(m), 5);
+      { const ultM = MESES_DISP[MESES_DISP.length - 1] || '', anio = ultM.slice(0, 4);   /* todos los meses del año del último mes con datos */
+        for (const m of MESES_DISP.filter(x => x.slice(0, 4) === anio).reverse()) await add('mes', m, nomMes(m), 5); }
       for (const w of [...new Set(FECHAS.map(lunes))].slice(-5).reverse()) await add('semana', w, 'Semana del ' + fCorta(w) + ' al ' + fCorta(addDays(w, 6)), 3);
       for (const d of FECHAS.slice(-7).reverse()) await add('dia', d, DIAS[dow(d)] + ' ' + fLarga(d), 1);
     } finally { Object.keys(S).forEach(k => { if (!(k in S0)) delete S[k]; }); Object.assign(S, S0); }
     return { version: VERSION_TABLERO, coment: (DATA.ajustes && DATA.ajustes.appComentarios) || '', dataAl: fLarga(FECHAS[FECHAS.length - 1]), oficial: ofi, rankDef: S0.rank, u: Object.keys(nombres), n: nombres,
       kpis: kp.map(k => ({ id: k.id, nombre: k.nombre, fmt: k.fmt, dec: k.dec, mejor: k.mejor, meta: k.meta, tol: k.tol, oculto: k.id === 'aoc' || undefined })), periodos };
   }
+  window.__datosApp = datosApp;   /* para revisar los datos de la app desde la consola */
   let publicando = false;
   async function publicarGH(forzarCred) {
     const d = window.DATOS_PROCESADOS; if (!d || publicando) return;
