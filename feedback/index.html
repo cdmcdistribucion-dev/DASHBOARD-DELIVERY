@@ -102,10 +102,10 @@ td.sel{background:#fff8dc;font-weight:700}
   <div class="tarjetas" id="tarjetas"></div>
 
   <span class="kick">POR OPERADOR LOGÍSTICO · MES A MES</span>
-  <div style="display:flex;flex-direction:column;gap:20px">
+  <div class="dos">
     <div class="card tw"><table id="tOlMes"></table><p class="nota" id="olMesNota"></p></div>
     <div class="card pad">
-      <div class="hd"><b id="evoTit">Evolución del año</b><div class="ley" id="leyOl"></div></div>
+      <div class="hd"><b id="evoTit">Evolución del año</b><span id="evoSub"></span></div>
       <div class="barras" id="barras"></div>
       <div class="lbls" id="lbls"></div>
     </div>
@@ -180,23 +180,25 @@ td.sel{background:#fff8dc;font-weight:700}
     var critOk = function (x) { return !st.crit || x[8] === st.crit; };
     var cuenta = function (o, m) { return R.filter(function (x) { return x[0].slice(0, 7) === m && (!o || x[4] === o) && critOk(x); }).length; };
     var cuentaA = function (o) { return MV.reduce(function (a, m) { return a + cuenta(o, m); }, 0); };
-    var fila = function (o, tt) { var a = st.mes ? cuenta(o, st.mes) : 0, b = st.mes && prevM ? cuenta(o, prevM) : null, d = b == null ? null : a - b;
-      return '<tr class="' + (tt ? 'tot' : '') + '"' + (tt ? '' : ' data-ol="' + esc(o) + '" style="cursor:pointer' + (st.ol === o ? ';outline:2px solid #f5b800;outline-offset:-2px;background:#fffbea' : '') + '"') + '><td><span class="dot" style="background:' + (tt ? '#111' : COL[o]) + '"></span><b>' + esc(tt ? 'Total' : o) + '</b>' + (!tt && st.ol === o ? ' <small style="color:#7a5a00">(en el gráfico)</small>' : '') + '</td>' + MV.map(function (m) { return '<td class="n' + (m === st.mes ? ' sel' : '') + '">' + nf(cuenta(o, m)) + '</td>'; }).join('') +
-        '<td class="n"><b>' + nf(cuentaA(o)) + '</b></td>' + (st.mes ? '<td class="n" style="font-weight:700;color:' + (d == null || d === 0 ? '#5f5f66' : d > 0 ? '#a32626' : '#17663a') + '">' + (d == null ? '—' : (d > 0 ? '+' : '') + d + (b ? ' (' + (d > 0 ? '+' : '') + Math.round(100 * d / b) + '%)' : '')) + '</td>' : '') + '</tr>'; };
-    $('tOlMes').innerHTML = '<thead><tr><th>OPERADOR LOGÍSTICO</th>' + MV.map(function (m) { return '<th class="n">' + MN[+m.slice(5) - 1].slice(0, 3).toUpperCase() + '</th>'; }).join('') + '<th class="n">TOTAL ' + anio + '</th>' + (st.mes ? '<th class="n">VS MES ANT.</th>' : '') + '</tr></thead><tbody>' + OLS.map(function (o) { return fila(o, false); }).join('') + fila('', true) + '</tbody>';
-    $('olMesNota').textContent = 'Cantidad de feedbacks por mes en ' + anio + '. Clic en un operador para ver su evolución en el gráfico (otro clic vuelve a todos).' + (st.mes ? ' Variación: mes elegido contra el anterior (menos es mejor).' : '');
+    var mesRef = st.mes || MESES[MESES.length - 1], miR = MESES.indexOf(mesRef), antR = miR > 0 ? MESES[miR - 1] : null;
+    var fila = function (o, tt) { var a = cuenta(o, mesRef), b = antR ? cuenta(o, antR) : null, d = b == null ? null : a - b;
+      return '<tr class="' + (tt ? 'tot' : '') + '"' + (tt ? '' : ' data-ol="' + esc(o) + '" style="cursor:pointer' + (st.ol === o ? ';outline:2px solid #f5b800;outline-offset:-2px;background:#fffbea' : '') + '"') + '><td><span class="dot" style="background:' + (tt ? '#111' : COL[o]) + '"></span><b>' + esc(tt ? 'Total' : o) + '</b>' + (!tt && st.ol === o ? ' <small style="color:#7a5a00">(en el gráfico)</small>' : '') + '</td>' +
+        (antR ? '<td class="n">' + nf(b) + '</td>' : '') + '<td class="n sel">' + nf(a) + '</td>' +
+        '<td class="n" style="font-weight:700;color:' + (d == null || d === 0 ? '#5f5f66' : d > 0 ? '#a32626' : '#17663a') + '">' + (d == null ? '—' : (d > 0 ? '+' : '') + d + (b ? ' (' + (d > 0 ? '+' : '') + Math.round(100 * d / b) + '%)' : '')) + '</td><td class="n"><b>' + nf(cuentaA(o)) + '</b></td></tr>'; };
+    var mC = function (m) { return MN[+m.slice(5) - 1].slice(0, 3).toUpperCase() + ' ' + m.slice(2, 4); };
+    $('tOlMes').innerHTML = '<thead><tr><th>OPERADOR LOGÍSTICO</th>' + (antR ? '<th class="n">' + mC(antR) + '</th>' : '') + '<th class="n">' + mC(mesRef) + '</th><th class="n">VARIACIÓN</th><th class="n">TOTAL ' + anio + '</th></tr></thead><tbody>' + OLS.map(function (o) { return fila(o, false); }).join('') + fila('', true) + '</tbody>';
+    $('olMesNota').textContent = 'Resumen de ' + mesLbl(mesRef).toLowerCase() + (antR ? ' contra ' + mesLbl(antR).toLowerCase() : '') + ' (menos es mejor). Clic en un operador para ver su evolución en el gráfico; otro clic vuelve al total.';
     document.querySelectorAll('#tOlMes tr[data-ol]').forEach(function (tr) { tr.onclick = function () { st.ol = st.ol === tr.dataset.ol ? '' : tr.dataset.ol; $('selOl').value = st.ol; render(); }; });
-    /* evolución: barras apiladas por OL (todos) o una sola serie (OL elegido) */
-    var OLG = st.ol ? [st.ol] : OLS, mx = 1;
-    MV.forEach(function (m) { mx = Math.max(mx, OLG.reduce(function (a, o) { return a + cuenta(o, m); }, 0)); });
+    /* evolución del año: barras con el total (o del OL elegido) */
+    var serie = MV.map(function (m) { return cuenta(st.ol, m); }), mx = Math.max.apply(null, serie.concat([1]));
     var cols = 'grid-template-columns:repeat(' + MV.length + ',minmax(0,1fr))';
     $('barras').setAttribute('style', cols); $('lbls').setAttribute('style', cols);
-    $('evoTit').textContent = 'Evolución ' + anio + ' · ' + (st.ol || 'todos los OL');
-    $('barras').innerHTML = MV.map(function (m) { var tt = OLG.reduce(function (a, o) { return a + cuenta(o, m); }, 0);
-      return '<div class="grupo"><div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;width:min(48px,80%);gap:4px"><span style="font-size:12px;font-weight:700">' + nf(tt) + '</span><div style="display:flex;flex-direction:column-reverse;width:100%;height:' + Math.max(2, Math.round(tt / mx * 190)) + 'px;border-radius:5px 5px 0 0;overflow:hidden' + (m === st.mes ? ';outline:2px solid #111;outline-offset:1px' : '') + '">' +
-        OLG.map(function (o) { var v = cuenta(o, m); return v ? '<div title="' + esc(o) + ' · ' + mesLbl(m) + ': ' + v + '" style="flex:' + v + ' 0 0;background:' + COL[o] + '"></div>' : ''; }).join('') + '</div></div></div>'; }).join('');
+    $('evoTit').textContent = 'Evolución ' + anio + ' · ' + (st.ol || 'total');
+    $('evoSub').textContent = 'Feedbacks por mes';
+    var colB = st.ol ? COL[st.ol] : '#111';
+    $('barras').innerHTML = MV.map(function (m, i) { var v = serie[i];
+      return '<div class="grupo"><div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;width:min(44px,80%);gap:4px"><span style="font-size:12px;font-weight:700">' + nf(v) + '</span><div title="' + mesLbl(m) + ': ' + v + '" style="width:100%;height:' + Math.max(2, Math.round(v / mx * 190)) + 'px;border-radius:5px 5px 0 0;background:' + (m === st.mes ? '#f5b800' : colB) + '"></div></div></div>'; }).join('');
     $('lbls').innerHTML = MV.map(function (m) { return '<span' + (m === st.mes ? ' style="color:#111"' : '') + '>' + MN[+m.slice(5) - 1].slice(0, 3).toUpperCase() + '</span>'; }).join('');
-    $('leyOl').innerHTML = OLG.map(function (o) { return '<span style="font-size:12px;color:#5f5f66"><span class="dot" style="background:' + COL[o] + ';margin-right:6px"></span>' + esc(o) + '</span>'; }).join('');
     /* pareto */
     var byCat = {}; F.forEach(function (x) { byCat[x[6]] = (byCat[x[6]] || 0) + 1; });
     var cats = Object.keys(byCat).map(function (k) { return [k, byCat[k]]; }).sort(function (a, b) { return b[1] - a[1]; });
