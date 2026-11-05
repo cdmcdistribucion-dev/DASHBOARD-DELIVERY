@@ -25,7 +25,7 @@ h1{margin:0;font-size:30px;line-height:1.15;color:var(--tit)}
 .selbox select{border:0;background:transparent;font-weight:700;font-size:15px;color:var(--tit);padding:2px 0;min-width:180px;font-family:inherit}
 .btn{background:var(--neg);color:#fff;border:2px solid var(--ama);border-radius:10px;padding:12px 16px;font-weight:700;font-size:14px;font-family:inherit;display:flex;align-items:center;gap:8px;cursor:pointer}
 .card{background:#fff;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.07)}
-.tarjetas{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px}
+.tarjetas{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}
 .tj{padding:16px;display:flex;flex-direction:column;gap:6px}
 .tj span{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--gris)}
 .tj b{font-size:32px;line-height:1.05;color:var(--tit)}
@@ -57,7 +57,7 @@ td.sel{background:#fff8dc;font-weight:700}
 .bc i{display:block;width:20px;border-radius:4px 4px 0 0}
 .lbls{display:grid;gap:14px;padding:0 6px}
 .lbls span{text-align:center;font-size:12px;font-weight:700;color:var(--gris)}
-.par{display:grid;grid-template-columns:200px minmax(0,1fr) 46px 58px;gap:10px;align-items:center}
+.par{display:grid;grid-template-columns:200px minmax(0,1fr) 46px 64px;gap:10px;align-items:center}
 .par .t{position:relative;height:22px;background:var(--fondo);border-radius:6px}
 .par .t i{position:absolute;left:0;top:0;bottom:0;border-radius:6px}
 .par .n{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -102,10 +102,10 @@ td.sel{background:#fff8dc;font-weight:700}
   <div class="tarjetas" id="tarjetas"></div>
 
   <span class="kick">POR OPERADOR LOGÍSTICO · MES A MES</span>
-  <div class="dos">
-    <div class="card tw"><table id="tOlMes"></table><p class="nota">Cantidad de feedbacks por mes. Variación: mes elegido contra el anterior (menos es mejor).</p></div>
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <div class="card tw"><table id="tOlMes"></table><p class="nota" id="olMesNota"></p></div>
     <div class="card pad">
-      <div class="hd"><b>Feedbacks por mes y OL</b><div class="ley" id="leyOl"></div></div>
+      <div class="hd"><b id="evoTit">Evolución del año</b><div class="ley" id="leyOl"></div></div>
       <div class="barras" id="barras"></div>
       <div class="lbls" id="lbls"></div>
     </div>
@@ -113,7 +113,7 @@ td.sel{background:#fff8dc;font-weight:700}
 
   <span class="kick">POR CATEGORÍA Y CRITICIDAD</span>
   <div class="dos b">
-    <div class="card pad"><div class="hd"><b>Pareto por categoría</b><span>Barra: cantidad · a la derecha: % acumulado</span></div><div id="pareto" style="display:flex;flex-direction:column;gap:12px"></div><p class="nota" id="parNota" style="padding:10px 0 0"></p></div>
+    <div class="card pad"><div class="hd"><b>Pareto por categoría</b><span>Cantidad y % que representa cada categoría</span></div><div id="pareto" style="display:flex;flex-direction:column;gap:12px"></div><p class="nota" id="parNota" style="padding:10px 0 0"></p></div>
     <div style="display:flex;flex-direction:column;gap:20px">
       <div class="card pad"><div class="hd"><b>Criticidad</b><span>Según la subcategoría (hoja Criticidad de la configuración)</span></div><div class="crit3" id="crit"></div><div id="critOl" style="display:flex;flex-direction:column;gap:8px"></div></div>
       <div class="card pad"><b style="font-size:16px;color:#111">Estado del tratamiento</b><div class="est" id="estBar"></div><div class="ley" id="estLey"></div><p style="margin:0;font-size:12px;color:#5f5f66" id="estNota"></p></div>
@@ -132,7 +132,7 @@ td.sel{background:#fff8dc;font-weight:700}
   <div class="card tw">
     <div class="busca"><div><label for="inBus">BUSCAR CLIENTE, RAZÓN SOCIAL, DIRECCIÓN, CHOFER O PLANILLA</label><input id="inBus" placeholder="Ej.: Almacén, Av. Calchaquí"></div><span style="font-size:13px;color:#5f5f66" id="cliNota"></span></div>
     <table id="tCli"></table>
-    <p class="nota">Ordenados por cantidad de feedbacks del mes. La razón social y la dirección salen de la bajada de RCH; el chofer, de SALIDA por la planilla del feedback.</p>
+    <p class="nota">Ordenados por cantidad de feedbacks del período. La razón social y la dirección salen de la bajada de RCH; el chofer, de SALIDA por la planilla del feedback.</p>
   </div>
   <p class="nota" id="fuenteNota" style="border:0;padding:0"></p>
 </main>
@@ -158,43 +158,51 @@ td.sel{background:#fff8dc;font-weight:700}
   var COL = {}; OLS.forEach(function (o, i) { COL[o] = o === 'Sin OL' ? '#b9b9bf' : PAL[i % PAL.length]; });
   var st = { mes: MESES[MESES.length - 1], ol: '', crit: '', q: '' };
   $('al').textContent = 'Datos al ' + D.dataAl;
-  $('selMes').innerHTML = MESES.slice().reverse().map(function (m) { return '<option value="' + m + '">' + mesLbl(m) + '</option>'; }).join('');
+  $('selMes').innerHTML = '<option value="">Todos los meses</option>' + MESES.slice().reverse().map(function (m) { return '<option value="' + m + '">' + mesLbl(m) + '</option>'; }).join('');
   $('selOl').innerHTML = '<option value="">Todos los OL</option>' + OLS.map(function (o) { return '<option>' + esc(o) + '</option>'; }).join('');
 
   function base(m) { return R.filter(function (x) { return (!m || x[0].slice(0, 7) === m) && (!st.ol || x[4] === st.ol) && (!st.crit || x[8] === st.crit); }); }
   function render() {
     var F = base(st.mes), tot = F.length, mi = MESES.indexOf(st.mes), prevM = mi > 0 ? MESES[mi - 1] : null, prev = prevM ? base(prevM).length : null;
-    $('tit').textContent = mesLbl(st.mes) + (st.ol ? ' · ' + st.ol : '') + (st.crit ? ' · criticidad ' + st.crit.toLowerCase() : '');
+    var perLbl = st.mes ? mesLbl(st.mes) : 'Todos los meses (' + mesLbl(MESES[0]).toLowerCase() + ' a ' + mesLbl(MESES[MESES.length - 1]).toLowerCase() + ')';
+    $('tit').textContent = perLbl + (st.ol ? ' · ' + st.ol : '') + (st.crit ? ' · criticidad ' + st.crit.toLowerCase() : '');
     var pdv = {}, chs = {}; F.forEach(function (x) { pdv[x[3]] = 1; if (x[5]) chs[x[5]] = 1; });
     var cerr = F.filter(function (x) { return clase(x[9]) === 'cerrado'; }).length, venc = F.filter(vencido).length, alta = F.filter(function (x) { return x[8] === 'Alta'; }).length;
     var T = [
-      ['hero', 'FEEDBACKS (PDV CRÍTICO)', nf(tot), prev == null ? 'Sin mes anterior' : (tot - prev > 0 ? '▲ ' : tot - prev < 0 ? '▼ ' : '') + Math.abs(tot - prev) + ' vs ' + MN[+prevM.slice(5) - 1]],
+      ['hero', 'FEEDBACKS (PDV CRÍTICO)', nf(tot), prev == null ? (st.mes ? 'Sin mes anterior' : 'en ' + MESES.length + ' meses') : (tot - prev > 0 ? '▲ ' : tot - prev < 0 ? '▼ ' : '') + Math.abs(tot - prev) + ' vs ' + MN[+prevM.slice(5) - 1]],
       ['', 'PDV DISTINTOS', nf(Object.keys(pdv).length), 'clientes con al menos un feedback'],
       ['rojo', 'ALTA CRITICIDAD', nf(alta), pc(alta, tot) + ' del total'],
       ['', 'CERRADOS', nf(cerr), pc(cerr, tot) + ' del total'],
-      ['rojo', 'VENCIDOS SIN CERRAR', nf(venc), 'pasaron la fecha límite'],
-      ['', 'CHOFERES QUE INFORMARON', nf(Object.keys(chs).length), 'con al menos un feedback']];
+      ['rojo', 'VENCIDOS SIN CERRAR', nf(venc), 'pasaron la fecha límite']];
     $('tarjetas').innerHTML = T.map(function (t) { return '<div class="card tj ' + t[0] + '"><span>' + t[1] + '</span><b>' + t[2] + '</b><small>' + t[3] + '</small></div>'; }).join('');
-    /* OL mes a mes (últimos 6 meses) */
-    var MV = MESES.slice(-6); if (MV.indexOf(st.mes) < 0) MV = MESES.slice(Math.max(0, mi - 5), mi + 1);
+    /* OL mes a mes: todos los meses del año (del mes elegido, o del último con datos) */
+    var anio = (st.mes || MESES[MESES.length - 1]).slice(0, 4), ultA = MESES.filter(function (m) { return m.slice(0, 4) === anio; }).pop(), MV = []; for (var mm = 1; mm <= +ultA.slice(5); mm++) MV.push(anio + '-' + (mm < 10 ? '0' : '') + mm);   /* de enero al último mes con datos, con 0 en los meses sin feedback */
     var critOk = function (x) { return !st.crit || x[8] === st.crit; };
     var cuenta = function (o, m) { return R.filter(function (x) { return x[0].slice(0, 7) === m && (!o || x[4] === o) && critOk(x); }).length; };
-    var fila = function (o, tt) { var a = cuenta(o, st.mes), b = prevM ? cuenta(o, prevM) : null, d = b == null ? null : a - b;
-      return '<tr class="' + (tt ? 'tot' : '') + '"' + (st.ol && st.ol === o ? ' style="outline:2px solid #f5b800;outline-offset:-2px"' : '') + '><td><span class="dot" style="background:' + (tt ? '#111' : COL[o]) + '"></span><b>' + esc(tt ? 'Total' : o) + '</b></td>' + MV.map(function (m) { return '<td class="n' + (m === st.mes ? ' sel' : '') + '">' + nf(cuenta(o, m)) + '</td>'; }).join('') +
-        '<td class="n" style="font-weight:700;color:' + (d == null || d === 0 ? '#5f5f66' : d > 0 ? '#a32626' : '#17663a') + '">' + (d == null ? '—' : (d > 0 ? '+' : '') + d + (b ? ' (' + (d > 0 ? '+' : '') + Math.round(100 * d / b) + '%)' : '')) + '</td></tr>'; };
-    $('tOlMes').innerHTML = '<thead><tr><th>OPERADOR LOGÍSTICO</th>' + MV.map(function (m) { return '<th class="n">' + MN[+m.slice(5) - 1].slice(0, 3).toUpperCase() + '</th>'; }).join('') + '<th class="n">VS MES ANT.</th></tr></thead><tbody>' + OLS.map(function (o) { return fila(o, false); }).join('') + fila('', true) + '</tbody>';
-    var mx = 1; OLS.forEach(function (o) { MV.forEach(function (m) { mx = Math.max(mx, cuenta(o, m)); }); });
+    var cuentaA = function (o) { return MV.reduce(function (a, m) { return a + cuenta(o, m); }, 0); };
+    var fila = function (o, tt) { var a = st.mes ? cuenta(o, st.mes) : 0, b = st.mes && prevM ? cuenta(o, prevM) : null, d = b == null ? null : a - b;
+      return '<tr class="' + (tt ? 'tot' : '') + '"' + (tt ? '' : ' data-ol="' + esc(o) + '" style="cursor:pointer' + (st.ol === o ? ';outline:2px solid #f5b800;outline-offset:-2px;background:#fffbea' : '') + '"') + '><td><span class="dot" style="background:' + (tt ? '#111' : COL[o]) + '"></span><b>' + esc(tt ? 'Total' : o) + '</b>' + (!tt && st.ol === o ? ' <small style="color:#7a5a00">(en el gráfico)</small>' : '') + '</td>' + MV.map(function (m) { return '<td class="n' + (m === st.mes ? ' sel' : '') + '">' + nf(cuenta(o, m)) + '</td>'; }).join('') +
+        '<td class="n"><b>' + nf(cuentaA(o)) + '</b></td>' + (st.mes ? '<td class="n" style="font-weight:700;color:' + (d == null || d === 0 ? '#5f5f66' : d > 0 ? '#a32626' : '#17663a') + '">' + (d == null ? '—' : (d > 0 ? '+' : '') + d + (b ? ' (' + (d > 0 ? '+' : '') + Math.round(100 * d / b) + '%)' : '')) + '</td>' : '') + '</tr>'; };
+    $('tOlMes').innerHTML = '<thead><tr><th>OPERADOR LOGÍSTICO</th>' + MV.map(function (m) { return '<th class="n">' + MN[+m.slice(5) - 1].slice(0, 3).toUpperCase() + '</th>'; }).join('') + '<th class="n">TOTAL ' + anio + '</th>' + (st.mes ? '<th class="n">VS MES ANT.</th>' : '') + '</tr></thead><tbody>' + OLS.map(function (o) { return fila(o, false); }).join('') + fila('', true) + '</tbody>';
+    $('olMesNota').textContent = 'Cantidad de feedbacks por mes en ' + anio + '. Clic en un operador para ver su evolución en el gráfico (otro clic vuelve a todos).' + (st.mes ? ' Variación: mes elegido contra el anterior (menos es mejor).' : '');
+    document.querySelectorAll('#tOlMes tr[data-ol]').forEach(function (tr) { tr.onclick = function () { st.ol = st.ol === tr.dataset.ol ? '' : tr.dataset.ol; $('selOl').value = st.ol; render(); }; });
+    /* evolución: barras apiladas por OL (todos) o una sola serie (OL elegido) */
+    var OLG = st.ol ? [st.ol] : OLS, mx = 1;
+    MV.forEach(function (m) { mx = Math.max(mx, OLG.reduce(function (a, o) { return a + cuenta(o, m); }, 0)); });
     var cols = 'grid-template-columns:repeat(' + MV.length + ',minmax(0,1fr))';
     $('barras').setAttribute('style', cols); $('lbls').setAttribute('style', cols);
-    $('barras').innerHTML = MV.map(function (m) { return '<div class="grupo">' + OLS.map(function (o) { var v = cuenta(o, m); return '<div class="bc" title="' + esc(o) + ': ' + v + '"><span>' + v + '</span><i style="height:' + Math.max(2, Math.round(v / mx * 190)) + 'px;background:' + COL[o] + (st.ol && st.ol !== o ? ';opacity:.25' : '') + '"></i></div>'; }).join('') + '</div>'; }).join('');
+    $('evoTit').textContent = 'Evolución ' + anio + ' · ' + (st.ol || 'todos los OL');
+    $('barras').innerHTML = MV.map(function (m) { var tt = OLG.reduce(function (a, o) { return a + cuenta(o, m); }, 0);
+      return '<div class="grupo"><div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;width:min(48px,80%);gap:4px"><span style="font-size:12px;font-weight:700">' + nf(tt) + '</span><div style="display:flex;flex-direction:column-reverse;width:100%;height:' + Math.max(2, Math.round(tt / mx * 190)) + 'px;border-radius:5px 5px 0 0;overflow:hidden' + (m === st.mes ? ';outline:2px solid #111;outline-offset:1px' : '') + '">' +
+        OLG.map(function (o) { var v = cuenta(o, m); return v ? '<div title="' + esc(o) + ' · ' + mesLbl(m) + ': ' + v + '" style="flex:' + v + ' 0 0;background:' + COL[o] + '"></div>' : ''; }).join('') + '</div></div></div>'; }).join('');
     $('lbls').innerHTML = MV.map(function (m) { return '<span' + (m === st.mes ? ' style="color:#111"' : '') + '>' + MN[+m.slice(5) - 1].slice(0, 3).toUpperCase() + '</span>'; }).join('');
-    $('leyOl').innerHTML = OLS.map(function (o) { return '<span style="font-size:12px;color:#5f5f66"><span class="dot" style="background:' + COL[o] + ';margin-right:6px"></span>' + esc(o) + '</span>'; }).join('');
+    $('leyOl').innerHTML = OLG.map(function (o) { return '<span style="font-size:12px;color:#5f5f66"><span class="dot" style="background:' + COL[o] + ';margin-right:6px"></span>' + esc(o) + '</span>'; }).join('');
     /* pareto */
     var byCat = {}; F.forEach(function (x) { byCat[x[6]] = (byCat[x[6]] || 0) + 1; });
     var cats = Object.keys(byCat).map(function (k) { return [k, byCat[k]]; }).sort(function (a, b) { return b[1] - a[1]; });
     var ac = 0, top = cats.length ? cats[0][1] : 1, en80 = 0;
     $('pareto').innerHTML = cats.map(function (c) { var antes = 100 * ac / tot; ac += c[1]; var p = 100 * ac / tot, vital = antes < 80; if (vital) en80++;
-      return '<div class="par"><span class="n" title="' + esc(c[0]) + '">' + esc(c[0]) + '</span><div class="t"><i style="width:' + Math.round(c[1] / top * 100) + '%;background:' + (vital ? '#111' : '#b9b9bf') + '"></i></div><b style="font-size:13px;text-align:right">' + nf(c[1]) + '</b><span style="font-size:12px;text-align:right;color:' + (vital ? '#a32626' : '#6f6f76') + ';font-weight:' + (vital ? 700 : 400) + '">' + Math.round(p) + '%</span></div>'; }).join('') || '<div class="vacio">Sin feedbacks en el período.</div>';
+      return '<div class="par"><span class="n" title="' + esc(c[0]) + '">' + esc(c[0]) + '</span><div class="t"><i style="width:' + Math.round(c[1] / top * 100) + '%;background:' + (vital ? '#111' : '#b9b9bf') + '"></i></div><b style="font-size:13px;text-align:right">' + nf(c[1]) + '</b><span style="font-size:12px;text-align:right;color:#2b2b2e;font-weight:700">' + pc(c[1], tot) + '</span></div>'; }).join('') || '<div class="vacio">Sin feedbacks en el período.</div>';
     $('parNota').textContent = cats.length ? en80 + ' de ' + cats.length + ' categorías explican el 80% de los feedbacks (barras negras).' : '';
     /* criticidad */
     var CR = ['Alta', 'Media', 'Baja', 'Sin definir'], CC = { Alta: '#d64545', Media: '#e0a800', Baja: '#6b8fd6', 'Sin definir': '#b9b9bf' };
@@ -205,7 +213,7 @@ td.sel{background:#fff8dc;font-weight:700}
     var EC = { cerrado: '#1f9a4a', trat: '#e0a800', abierto: '#d64545' }, es = Object.keys(byE).sort(function (a, b) { return byE[b] - byE[a]; });
     $('estBar').innerHTML = es.map(function (e) { return '<div title="' + esc(e) + ': ' + byE[e] + '" style="height:100%;width:' + 100 * byE[e] / (tot || 1) + '%;background:' + EC[clase(e)] + ';border-right:1px solid #fff"></div>'; }).join('');
     $('estLey').innerHTML = es.map(function (e) { return '<span><span class="dot" style="background:' + EC[clase(e)] + ';margin-right:6px"></span>' + esc(e) + ' <b>' + nf(byE[e]) + '</b> <span style="color:#6f6f76">(' + pc(byE[e], tot) + ')</span></span>'; }).join('');
-    $('estNota').textContent = 'Vencidos: no están cerrados y ya pasó la fecha límite (due date). Hoy hay ' + nf(venc) + ' vencidos en este mes.';
+    $('estNota').textContent = 'Vencidos: no están cerrados y ya pasó la fecha límite (due date). Hoy hay ' + nf(venc) + ' vencidos ' + (st.mes ? 'en este mes.' : 'en total.');
     /* subcategorías */
     var bySub = {}; F.forEach(function (x) { var k = x[6] + '|' + x[7]; var o = bySub[k] || (bySub[k] = { cat: x[6], sub: x[7], crit: x[8], n: 0, p: {}, ab: 0 }); o.n++; o.p[x[3]] = 1; if (clase(x[9]) !== 'cerrado') o.ab++; });
     var subs = Object.keys(bySub).map(function (k) { return bySub[k]; }).sort(function (a, b) { return b.n - a.n; });
@@ -221,21 +229,24 @@ td.sel{background:#fff8dc;font-weight:700}
     var q = st.q.toLowerCase();
     var CL = Object.keys(byC).map(function (c) { var rs = byC[c].slice().sort(function (a, b) { return a[0] < b[0] ? 1 : -1; }), u = rs[0], i = CLI[c] || ['', '', ''], chs = {};
       rs.forEach(function (x) { if (x[5]) chs[x[5]] = 1; });
-      return { c: c, rs: i[0], dir: [i[1], i[2]].filter(Boolean).join(', '), n: rs.length, u: u, ch: Object.keys(chs).join(', '), plans: rs.map(function (x) { return x[2]; }).join(' ') };
+      return { c: c, rs: i[0], dir: [i[1], i[2]].filter(Boolean).join(', '), n: rs.length, u: u, todos: rs, ch: Object.keys(chs).join(', '), plans: rs.map(function (x) { return x[2]; }).join(' ') };
     }).filter(function (o) { return !q || (o.c + ' ' + o.rs + ' ' + o.dir + ' ' + o.ch + ' ' + o.plans).toLowerCase().indexOf(q) >= 0; }).sort(function (a, b) { return b.n - a.n || (a.u[0] < b.u[0] ? 1 : -1); });
     $('cliNota').textContent = nf(CL.length) + ' clientes' + (CL.length > 100 ? ' · se muestran 100 (la descarga trae todos)' : '');
     var eCl = function (e) { return 'e-' + clase(e); };
-    $('tCli').innerHTML = '<thead><tr><th>CLIENTE · PLANILLA</th><th>RAZÓN SOCIAL</th><th>DIRECCIÓN</th><th>OL · CHOFER</th><th class="n">FEEDBACKS</th><th>ÚLTIMO: CATEGORÍA / SUBCATEGORÍA</th><th>COMENTARIO DEL CHOFER</th><th>TRATAMIENTO</th><th>ESTADO</th></tr></thead><tbody>' +
-      (CL.slice(0, 100).map(function (o) { var u = o.u; return '<tr><td><b>' + esc(o.c) + '</b><div style="font-size:11px;color:#6f6f76;margin-top:3px">' + fC(u[0]) + (u[2] ? ' · planilla ' + esc(u[2]) : '') + '</div></td><td>' + esc(o.rs || '—') + '</td><td style="color:#5f5f66">' + esc(o.dir || '—') + '</td><td>' + esc(u[4]) + '<div style="font-size:12px;color:#6f6f76;margin-top:3px">' + esc(o.ch || 'Sin chofer encontrado') + '</div></td><td class="n"><b>' + o.n + '</b></td><td>' + esc(u[6]) + '<div style="margin-top:3px"><span class="chip ' + critCl(u[8]) + '">' + esc(u[7]) + '</span></div></td><td style="max-width:240px">' + esc(u[10] || '—') + '</td><td style="max-width:240px;color:#5f5f66">' + esc(u[11] || 'Sin respuesta todavía') + '</td><td><span class="chip ' + eCl(u[9]) + '">' + esc(u[9]) + (vencido(u) ? ' · vencido' : '') + '</span></td></tr>'; }).join('') || '<tr><td colspan="9" class="vacio">Sin clientes con ese filtro.</td></tr>') + '</tbody>';
+    /* Cliente con varios feedbacks: todas sus subcategorías (la más reciente primero, con fecha) y cada comentario con su fecha */
+    var subsCli = function (rs) { return rs.map(function (x) { return '<div style="margin-bottom:6px">' + (rs.length > 1 ? '<small style="color:#6f6f76">' + fC(x[0]).slice(0, 5) + ' · </small>' : '') + esc(x[6]) + '<div style="margin-top:2px"><span class="chip ' + critCl(x[8]) + '">' + esc(x[7]) + '</span></div></div>'; }).join(''); };
+    var lista = function (rs, j, vacio) { if (rs.length === 1) return esc(rs[0][j] || vacio); return rs.map(function (x) { return '<div style="margin-bottom:6px"><small style="color:#6f6f76">' + fC(x[0]).slice(0, 5) + ':</small> ' + esc(x[j] || vacio) + '</div>'; }).join(''); };
+    $('tCli').innerHTML = '<thead><tr><th>CLIENTE · PLANILLA</th><th>RAZÓN SOCIAL</th><th>DIRECCIÓN</th><th>OL · CHOFER</th><th class="n">FEEDBACKS</th><th>CATEGORÍAS / SUBCATEGORÍAS</th><th>COMENTARIO DEL CHOFER</th><th>TRATAMIENTO</th><th>ESTADO</th></tr></thead><tbody>' +
+      (CL.slice(0, 100).map(function (o) { var u = o.u; return '<tr><td><b>' + esc(o.c) + '</b><div style="font-size:11px;color:#6f6f76;margin-top:3px">' + (o.todos.length > 1 ? o.todos.length + ' feedbacks · último ' : '') + fC(u[0]) + (u[2] ? ' · planilla ' + esc(u[2]) : '') + '</div></td><td>' + esc(o.rs || '—') + '</td><td style="color:#5f5f66">' + esc(o.dir || '—') + '</td><td>' + esc(u[4]) + '<div style="font-size:12px;color:#6f6f76;margin-top:3px">' + esc(o.ch || 'Sin chofer encontrado') + '</div></td><td class="n"><b>' + o.n + '</b></td><td>' + subsCli(o.todos) + '</td><td style="max-width:240px">' + lista(o.todos, 10, '—') + '</td><td style="max-width:240px;color:#5f5f66">' + lista(o.todos, 11, 'Sin respuesta todavía') + '</td><td>' + o.todos.map(function (x) { return '<div style="margin-bottom:6px"><span class="chip ' + eCl(x[9]) + '">' + esc(x[9]) + (vencido(x) ? ' · vencido' : '') + '</span>' + (o.todos.length > 1 ? ' <small style="color:#6f6f76">' + fC(x[0]).slice(0, 5) + '</small>' : '') + '</div>'; }).join('') + '</td></tr>'; }).join('') || '<tr><td colspan="9" class="vacio">Sin clientes con ese filtro.</td></tr>') + '</tbody>';
     var fu = [0, 0, 0, 0, 0]; F.forEach(function (x) { fu[x[12]]++; });
-    $('fuenteNota').textContent = 'Cruce del chofer en ' + mesLbl(st.mes) + ': ' + nf(fu[0]) + ' por planilla en SALIDA (misma fecha) · ' + nf(fu[1]) + ' por planilla en SALIDA (otra fecha) · ' + nf(fu[2]) + ' por BEES (cliente y fecha) · ' + nf(fu[3]) + ' por RCH (cliente y fecha) · ' + nf(fu[4]) + ' sin chofer ni OL.';
+    $('fuenteNota').textContent = 'Cruce del chofer · ' + perLbl.toLowerCase() + ': ' + nf(fu[0]) + ' por planilla en SALIDA (misma fecha) · ' + nf(fu[1]) + ' por planilla en SALIDA (otra fecha) · ' + nf(fu[2]) + ' por BEES (cliente y fecha) · ' + nf(fu[3]) + ' por RCH (cliente y fecha) · ' + nf(fu[4]) + ' sin chofer ni OL.';
   }
   function descargar() {
     var F = base(st.mes), q = function (s) { s = String(s == null ? '' : s); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
     var L = [['Fecha', 'Fecha límite', 'Planilla', 'Cliente', 'Razón social', 'Dirección', 'Localidad', 'OL', 'Chofer', 'Categoría', 'Subcategoría', 'Criticidad', 'Estado', 'Vencido', 'Comentario del chofer', 'Comentario del tratamiento']];
     F.slice().sort(function (a, b) { return a[0] < b[0] ? -1 : 1; }).forEach(function (x) { var i = CLI[x[3]] || ['', '', '']; L.push([fC(x[0]), fC(x[1]), x[2], x[3], i[0], i[1], i[2], x[4], x[5], x[6], x[7], x[8], x[9], vencido(x) ? 'Sí' : 'No', x[10], x[11]]); });
     var blob = new Blob(['﻿' + L.map(function (r) { return r.map(q).join(';'); }).join('\r\n')], { type: 'text/csv;charset=utf-8' });
-    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'feedback_fleteros_' + st.mes + (st.ol ? '_' + st.ol.replace(/\W+/g, '_') : '') + '.csv'; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'feedback_fleteros_' + (st.mes || 'todos') + (st.ol ? '_' + st.ol.replace(/\W+/g, '_') : '') + '.csv'; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   }
   $('selMes').onchange = function (e) { st.mes = e.target.value; render(); };
   $('selOl').onchange = function (e) { st.ol = e.target.value; render(); };
