@@ -95,7 +95,7 @@ td.sel{background:#fff8dc;font-weight:700}
       <div class="selbox"><label for="selMes">MES</label><select id="selMes"></select></div>
       <div class="selbox"><label for="selOl">OPERADOR LOGÍSTICO</label><select id="selOl"></select></div>
       <div class="selbox"><label for="selCat">CATEGORÍA</label><select id="selCat"><option value="">Todas</option></select></div>
-      <div class="selbox"><label for="selCrit">CRITICIDAD</label><select id="selCrit"><option value="">Todas</option><option>Alta</option><option>Media</option><option>Baja</option><option>Sin definir</option></select></div>
+      <div class="selbox"><label for="selEst">STATUS</label><select id="selEst"><option value="">Todos</option></select></div>
       <button type="button" class="btn" id="bDesc"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f5b800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"></path></svg>Descargar Excel</button>
     </div>
   </div>
@@ -158,16 +158,16 @@ td.sel{background:#fff8dc;font-weight:700}
   /* Colores fijos por OL: TOL (Online) rojo · Levon celeste · Río de las Vueltas azul · Special Truck verde */
   var colorFijo = function (o) { var t = String(o).toLowerCase(); return /online|^tol\b/.test(t) ? '#d32f2f' : /levon|^tl\b/.test(t) ? '#29b6f6' : /rio de las vueltas|r[ií]o|^rdv\b/.test(t) ? '#1f3a8a' : /special|^st\b/.test(t) ? '#2e9d4a' : ''; };
   var COL = {}, ip = 0; OLS.forEach(function (o) { COL[o] = o === 'Otro OL' ? '#b9b9bf' : colorFijo(o) || PAL[(4 + ip++) % PAL.length]; });
-  var st = { mes: MESES[MESES.length - 1], ol: '', crit: '', cat: '', q: '' };
+  var st = { mes: MESES[MESES.length - 1], ol: '', est: '', cat: '', q: '' };
   $('al').textContent = 'Datos al ' + D.dataAl;
   $('selMes').innerHTML = '<option value="">Todos los meses</option>' + MESES.slice().reverse().map(function (m) { return '<option value="' + m + '">' + mesLbl(m) + '</option>'; }).join('');
   $('selOl').innerHTML = '<option value="">Todos los OL</option>' + OLS.map(function (o) { return '<option>' + esc(o) + '</option>'; }).join('');
 
-  function base(m) { return R.filter(function (x) { return (!m || x[0].slice(0, 7) === m) && (!st.ol || x[4] === st.ol) && (!st.crit || x[8] === st.crit) && (!st.cat || x[6] === st.cat); }); }
+  function base(m) { return R.filter(function (x) { return (!m || x[0].slice(0, 7) === m) && (!st.ol || x[4] === st.ol) && (!st.est || x[9] === st.est) && (!st.cat || x[6] === st.cat); }); }
   function render() {
     var F = base(st.mes), tot = F.length, mi = MESES.indexOf(st.mes), prevM = mi > 0 ? MESES[mi - 1] : null, prev = prevM ? base(prevM).length : null;
     var perLbl = st.mes ? mesLbl(st.mes) : 'Todos los meses (' + mesLbl(MESES[0]).toLowerCase() + ' a ' + mesLbl(MESES[MESES.length - 1]).toLowerCase() + ')';
-    $('tit').textContent = perLbl + (st.ol ? ' · ' + st.ol : '') + (st.cat ? ' · ' + st.cat : '') + (st.crit ? ' · criticidad ' + st.crit.toLowerCase() : '');
+    $('tit').textContent = perLbl + (st.ol ? ' · ' + st.ol : '') + (st.cat ? ' · ' + st.cat : '') + (st.est ? ' · status ' + st.est : '');
     var pdv = {}, chs = {}; F.forEach(function (x) { pdv[x[3]] = 1; if (x[5]) chs[x[5]] = 1; });
     var cerr = F.filter(function (x) { return clase(x[9]) === 'cerrado'; }).length, venc = F.filter(vencido).length, alta = F.filter(function (x) { return x[8] === 'Alta'; }).length;
     var T = [
@@ -179,7 +179,7 @@ td.sel{background:#fff8dc;font-weight:700}
     $('tarjetas').innerHTML = T.map(function (t) { return '<div class="card tj ' + t[0] + '"><span>' + t[1] + '</span><b>' + t[2] + '</b><small>' + t[3] + '</small></div>'; }).join('');
     /* OL mes a mes: todos los meses del año (del mes elegido, o del último con datos) */
     var anio = (st.mes || MESES[MESES.length - 1]).slice(0, 4), ultA = MESES.filter(function (m) { return m.slice(0, 4) === anio; }).pop(), MV = []; for (var mm = 1; mm <= +ultA.slice(5); mm++) MV.push(anio + '-' + (mm < 10 ? '0' : '') + mm);   /* de enero al último mes con datos, con 0 en los meses sin feedback */
-    var critOk = function (x) { return (!st.crit || x[8] === st.crit) && (!st.cat || x[6] === st.cat); };
+    var critOk = function (x) { return (!st.est || x[9] === st.est) && (!st.cat || x[6] === st.cat); };
     var cuenta = function (o, m) { return R.filter(function (x) { return x[0].slice(0, 7) === m && (!o || x[4] === o) && critOk(x); }).length; };
     var cuentaA = function (o) { return MV.reduce(function (a, m) { return a + cuenta(o, m); }, 0); };
     var mesRef = st.mes || MESES[MESES.length - 1], miR = MESES.indexOf(mesRef), antR = miR > 0 ? MESES[miR - 1] : null;
@@ -255,7 +255,9 @@ td.sel{background:#fff8dc;font-weight:700}
   }
   $('selMes').onchange = function (e) { st.mes = e.target.value; render(); };
   $('selOl').onchange = function (e) { st.ol = e.target.value; render(); };
-  $('selCrit').onchange = function (e) { st.crit = e.target.value; render(); };
+  /* Status: los valores de la columna Final Status, del que más feedbacks tiene al que menos */
+  (function () { var c = {}; R.forEach(function (x) { c[x[9]] = (c[x[9]] || 0) + 1; }); $('selEst').innerHTML = '<option value="">Todos</option>' + Object.keys(c).sort(function (a, b) { return c[b] - c[a] || a.localeCompare(b, 'es'); }).map(function (k) { return '<option value="' + esc(k) + '">' + esc(k) + '</option>'; }).join(''); })();
+  $('selEst').onchange = function (e) { st.est = e.target.value; render(); };
   /* categorías de la bajada, de la que más feedbacks tiene a la que menos */
   (function () { var c = {}; R.forEach(function (x) { c[x[6]] = (c[x[6]] || 0) + 1; }); $('selCat').innerHTML = '<option value="">Todas</option>' + Object.keys(c).sort(function (a, b) { return c[b] - c[a] || a.localeCompare(b, 'es'); }).map(function (k) { return '<option value="' + esc(k) + '">' + esc(k) + '</option>'; }).join(''); })();
   $('selCat').onchange = function (e) { st.cat = e.target.value; render(); };
