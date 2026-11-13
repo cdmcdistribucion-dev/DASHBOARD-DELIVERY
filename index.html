@@ -224,7 +224,7 @@ html{scroll-behavior:smooth}
 <header class="topbar">
   <div class="brand">
     <h1>DASHBOARD DISTRI</h1>
-    <small>KPIs de choferes y operadores logísticos · versión 2026-11-12 16:30</small>
+    <small>KPIs de choferes y operadores logísticos · versión 2026-11-12 19:00</small>
   </div>
   <div class="fresh">
     <span id="freshText"><span class="dot off"></span>Sin datos cargados</span>
@@ -743,9 +743,86 @@ function leerArchivo(f, modo) {
     else r.readAsArrayBuffer(f);
   });
 }
+/* ---------- Lector por partes para Excel muy grandes (por ejemplo la bajada de BEES de 260.000 filas) ----------
+   El navegador no puede armar de una sola vez el texto interno de una hoja de cientos de MB y la lectura normal devuelve 0 filas.
+   Este lector descomprime la hoja de a pedazos y va armando las filas, con la letra de cada columna igual que en Excel. */
+const XLSX_GRANDE = 25 * 1024 * 1024;
+function xmlDesc(t) { return t.indexOf('&') < 0 ? t : t.replace(/&(lt|gt|amp|quot|apos|#\d+|#x[0-9a-f]+);/gi, (m, e) => e === 'lt' ? '<' : e === 'gt' ? '>' : e === 'amp' ? '&' : e === 'quot' ? '"' : e === 'apos' ? "'" : e[1] === 'x' || e[1] === 'X' ? String.fromCodePoint(parseInt(e.slice(2), 16)) : String.fromCodePoint(+e.slice(1))); }
+function colNum(ref) { let n = 0; for (let i = 0; i < ref.length; i++) { const c = ref.charCodeAt(i); if (c < 65 || c > 90) break; n = n * 26 + c - 64; } return n - 1; }
+function zipEntradas(buf) {
+  const dv = new DataView(buf), u8 = new Uint8Array(buf); let e = -1;
+  for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 70000); i--) if (dv.getUint32(i, true) === 0x06054b50) { e = i; break; }
+  if (e < 0) throw new Error('no es un .xlsx (zip) válido');
+  let n = dv.getUint16(e + 10, true), off = dv.getUint32(e + 16, true); const out = {}, td = new TextDecoder();
+  for (let k = 0; k < n; k++) {
+    if (dv.getUint32(off, true) !== 0x02014b50) break;
+    const met = dv.getUint16(off + 10, true), csz = dv.getUint32(off + 20, true), ln = dv.getUint16(off + 28, true), lx = dv.getUint16(off + 30, true), lc = dv.getUint16(off + 32, true), lho = dv.getUint32(off + 42, true);
+    const nom = td.decode(u8.subarray(off + 46, off + 46 + ln));
+    const ini = lho + 30 + dv.getUint16(lho + 26, true) + dv.getUint16(lho + 28, true);
+    out[nom] = { met, datos: u8.subarray(ini, ini + csz) };
+    off += 46 + ln + lx + lc;
+  }
+  return out;
+}
+async function zipTexto(ent, alPedazo) {
+  let st = new Blob([ent.datos]).stream();
+  if (ent.met === 8) st = st.pipeThrough(new DecompressionStream('deflate-raw'));
+  else if (ent.met !== 0) throw new Error('compresión no soportada (' + ent.met + ')');
+  const rd = st.pipeThrough(new TextDecoderStream()).getReader(); let todo = '';
+  for (;;) { const { done, value } = await rd.read(); if (done) break; if (alPedazo) alPedazo(value); else todo += value; }
+  if (alPedazo) alPedazo(null);
+  return todo;
+}
+async function abrirLibroGrande(f) {
+  const buf = await leerArchivo(f, 'array'), z = zipEntradas(buf);
+  const tx = async n => z[n] ? await zipTexto(z[n]) : '';
+  const ss = [], sst = await tx('xl/sharedStrings.xml');
+  sst.replace(/<si>([\s\S]*?)<\/si>/g, (m, si) => { let t = ''; si.replace(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g, (m2, x) => { t += x; return ''; }); ss.push(xmlDesc(t)); return ''; });
+  const wbx = await tx('xl/workbook.xml'), rels = await tx('xl/_rels/workbook.xml.rels'), dest = {};
+  rels.replace(/<Relationship\b[^>]*>/g, m => { const id = (m.match(/\bId="([^"]+)"/) || [])[1], tg = (m.match(/\bTarget="([^"]+)"/) || [])[1]; if (id && tg) dest[id] = tg.replace(/^\/?xl\//, '').replace(/^\//, ''); return ''; });
+  const wb = { SheetNames: [], Sheets: {}, grande: true };
+  const hojas = []; wbx.replace(/<sheet\b[^>]*>/g, m => { const nm = xmlDesc((m.match(/\bname="([^"]*)"/) || [])[1] || 'Hoja'); const rid = (m.match(/\br:id="([^"]+)"/) || m.match(/\bid="([^"]+)"/) || [])[1]; hojas.push([nm, 'xl/' + (dest[rid] || '')]); return ''; });
+  for (const [nm, ruta] of hojas) {
+    if (!z[ruta]) continue;
+    const filas = []; let resto = '';
+    const procesar = txt => {
+      let i = 0;
+      for (;;) {
+        const a = txt.indexOf('<row', i); if (a < 0) { resto = txt.slice(i); return; }
+        const b = txt.indexOf('</row>', a); const b2 = txt.indexOf('/>', a), cierre = txt.indexOf('>', a);
+        if (cierre >= 0 && b2 === cierre - 1 && (b < 0 || b2 < b)) { i = cierre + 1; continue; }   /* <row .../> vacía */
+        if (b < 0) { resto = txt.slice(a); return; }
+        const fila = []; let algo = false, pos = 0;
+        const cuerpo = txt.slice(cierre + 1, b);
+        cuerpo.replace(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g, (m, at, dentro) => {
+          const r = (at.match(/\br="([A-Z]+)\d*"/) || [])[1], col = r ? colNum(r) : pos; pos = col + 1;
+          const t = (at.match(/\bt="([^"]+)"/) || [])[1] || 'n'; let v = '';
+          if (dentro != null) {
+            if (t === 'inlineStr') { let x = ''; dentro.replace(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g, (m2, y) => { x += y; return ''; }); v = xmlDesc(x); }
+            else { const vv = dentro.match(/<v>([\s\S]*?)<\/v>/); if (vv) { const raw = vv[1]; v = t === 's' ? (ss[+raw] != null ? ss[+raw] : '') : t === 'b' ? raw === '1' : t === 'str' || t === 'e' ? xmlDesc(raw) : (raw === '' ? '' : +raw); } }
+          }
+          while (fila.length < col) fila.push('');
+          fila[col] = v; if (v !== '' && v != null) algo = true; return '';
+        });
+        if (algo) filas.push(fila);
+        i = b + 6;
+      }
+    };
+    await zipTexto(z[ruta], ch => { if (ch == null) { if (resto) procesar(resto); return; } procesar(resto + ch); });
+    const anch = filas.reduce((m, r) => Math.max(m, r.length), 0);
+    for (const r of filas) while (r.length < anch) r.push('');
+    wb.SheetNames.push(nm); wb.Sheets[nm] = { _m: filas, '!ref': 'A1:' + (typeof letraDe === 'function' ? letraDe(Math.max(1, anch)) : 'A') + Math.max(1, filas.length) };
+  }
+  if (!wb.SheetNames.length) throw new Error('el lector por partes no encontró hojas');
+  return wb;
+}
 async function abrirLibro(f) {
   const op = { cellDates: false, cellFormula: false, cellHTML: false, cellStyles: false };
   const errs = [];
+  /* Excel muy grande: lector por partes (la lectura normal devuelve 0 filas o se queda sin memoria) */
+  if (f.size > XLSX_GRANDE && /\.xlsx$|\.xlsm$/i.test(f.name) && typeof DecompressionStream !== 'undefined') {
+    try { return await abrirLibroGrande(f); } catch (e) { errs.push('por partes: ' + e.message); }
+  }
   try { const b = await leerArchivo(f, 'array'); return XLSX.read(new Uint8Array(b), Object.assign({ type: 'array' }, op)); } catch (e) { errs.push('array: ' + e.message); }
   try { const b = await leerArchivo(f, 'binary'); return XLSX.read(b, Object.assign({ type: 'binary' }, op)); } catch (e) { errs.push('binary: ' + e.message); }
   try { const b = await leerArchivo(f, 'array'); return XLSX.read(new Uint8Array(b), Object.assign({ type: 'array', dense: true }, op)); } catch (e) { errs.push('dense: ' + e.message); }
@@ -753,6 +830,7 @@ async function abrirLibro(f) {
 }
 /* Matriz de valores de una hoja, sin recursión ni spread */
 function hojaAMatriz(ws) {
+  if (ws && ws._m) return ws._m;   /* hoja leída por partes: ya viene como matriz, con las columnas en su letra */
   const off = ws && ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']).s.c : 0;
   const pad = m => off > 0 ? m.map(r => new Array(off).fill('').concat(r)) : m;   /* la letra de cada columna tiene que coincidir con la del Excel */
   try { return pad(XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '', blankrows: false })); }
@@ -3233,7 +3311,7 @@ const FEED_HTML = "<!doctype html>\n<html lang=\"es\">\n<head>\n<meta charset=\"
    - Si el navegador no permite recordar carpetas, usa el selector clásico.
    ===================================================================== */
 (function () {
-  const VERSION_TABLERO = '2026-11-12 16:30';
+  const VERSION_TABLERO = '2026-11-12 19:00';
   const g = id => document.getElementById(id);
   function mensaje(t, error) { const m = g('msg'); m.textContent = t; m.className = error ? 'err' : ''; }
   const hora = d => d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
