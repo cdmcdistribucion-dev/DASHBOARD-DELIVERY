@@ -81,6 +81,74 @@ td.ok .p{color:var(--okT)}td.mal .p{color:var(--malT)}td.top .p{color:var(--topT
 @media (max-width:700px){main{padding:16px}header{padding:12px 16px}.graf{grid-template-columns:1fr}}
 </style>
 <script src="datos_campeonato.js"></script>
+<script>
+/* ---------- Ingreso con usuario y contraseña (links publicados) ----------
+   Los datos se publican cifrados (AES-GCM, clave derivada con PBKDF2 del usuario y la contraseña).
+   Sin la combinación correcta no se pueden leer, aunque alguien descargue el archivo. */
+window.DIMC_LOGIN = window.DIMC_LOGIN || (function () {
+  var LS = 'dimcLogin';
+  function aB64(u8) { var s = '', i, n = 0x8000; for (i = 0; i < u8.length; i += n) s += String.fromCharCode.apply(null, u8.subarray(i, i + n)); return btoa(s); }
+  function deB64(t) { var b = atob(t), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+  function cred(u, p) { return String(u || '').trim().toLowerCase() + '\n' + String(p || ''); }
+  async function llave(c, sal, n) {
+    var base = await crypto.subtle.importKey('raw', new TextEncoder().encode(c), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: sal, iterations: n, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  }
+  /* cifra bytes: devuelve { s, i, n, d } (d en base64) */
+  async function cifrar(u8, c, k) {
+    k = k || await nuevaLlave(c);
+    var iv = crypto.getRandomValues(new Uint8Array(12));
+    var ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, k.key, u8));
+    return { s: k.s, i: aB64(iv), n: k.n, d: aB64(ct) };
+  }
+  async function nuevaLlave(c) { var sal = crypto.getRandomValues(new Uint8Array(16)), n = 200000; return { s: aB64(sal), n: n, key: await llave(c, sal, n) }; }
+  async function descifrar(cif, c, datosB64) {
+    var k = await llave(c, deB64(cif.s), cif.n);
+    return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: deB64(cif.i) }, k, deB64(datosB64 != null ? datosB64 : cif.d)));
+  }
+  function guardado() { try { return sessionStorage.getItem(LS) || localStorage.getItem(LS) || ''; } catch (e) { return ''; } }
+  function guardar(c, rec) { try { sessionStorage.setItem(LS, c); if (rec) localStorage.setItem(LS, c); else localStorage.removeItem(LS); } catch (e) {} }
+  function salir() { try { sessionStorage.removeItem(LS); localStorage.removeItem(LS); } catch (e) {} location.reload(); }
+  function formulario(msg) {
+    return new Promise(function (res) {
+      var ov = document.getElementById('dimcLoginOv');
+      if (!ov) {
+        ov = document.createElement('div'); ov.id = 'dimcLoginOv';
+        ov.setAttribute('style', 'position:fixed;inset:0;z-index:99999;background:#f2f2f3;display:flex;flex-direction:column;font-family:Arial,Helvetica,sans-serif;color:#2b2b2e');
+        ov.innerHTML = '<div style="background:#000;border-bottom:4px solid #f5b800;padding:14px 24px"><b style="color:#fff;font-size:18px;display:block">DASHBOARD DISTRI</b><small style="color:#f5b800;font-size:13px">CD Mercado Central · Distribución</small></div>' +
+          '<div style="flex:1;display:flex;align-items:center;justify-content:center;padding:16px"><form id="dimcLoginF" style="background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.1);padding:28px;width:100%;max-width:360px;display:flex;flex-direction:column;gap:14px">' +
+          '<span style="color:#1f7a35;font-size:12px;font-weight:700;letter-spacing:.2em">INGRESO</span><b style="font-size:22px;color:#111">Ingresá para ver el tablero</b>' +
+          '<label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:700">Usuario<input id="dimcU" autocomplete="username" required style="border:1px solid #c9c9cf;border-radius:10px;padding:12px;font-size:15px;font-family:inherit"></label>' +
+          '<label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:700">Contraseña<input id="dimcP" type="password" autocomplete="current-password" required style="border:1px solid #c9c9cf;border-radius:10px;padding:12px;font-size:15px;font-family:inherit"></label>' +
+          '<label style="display:flex;align-items:center;gap:8px;font-size:13px"><input id="dimcR" type="checkbox" style="width:18px;height:18px"> Recordarme en esta compu</label>' +
+          '<p id="dimcMsg" role="alert" style="margin:0;color:#a32626;font-size:13px;min-height:16px"></p>' +
+          '<button id="dimcB" type="submit" style="background:#000;color:#fff;border:2px solid #f5b800;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Ingresar</button></form></div>';
+        document.body.appendChild(ov);
+      }
+      ov.style.display = 'flex';
+      var m = document.getElementById('dimcMsg'), b = document.getElementById('dimcB'); m.textContent = msg || ''; b.disabled = false; b.textContent = 'Ingresar';
+      setTimeout(function () { var u = document.getElementById('dimcU'); (u.value ? document.getElementById('dimcP') : u).focus(); }, 30);
+      document.getElementById('dimcLoginF').onsubmit = function (ev) { ev.preventDefault(); b.disabled = true; b.textContent = 'Verificando…'; res({ u: document.getElementById('dimcU').value, p: document.getElementById('dimcP').value, r: document.getElementById('dimcR').checked }); };
+    });
+  }
+  function cerrarForm() { var ov = document.getElementById('dimcLoginOv'); if (ov) ov.remove(); }
+  /* pide usuario y contraseña hasta que descifren; devuelve los bytes */
+  async function abrir(cif, datosB64) {
+    if (!(window.crypto && crypto.subtle)) throw new Error('este navegador no permite abrir datos protegidos; usá Chrome o Edge actualizados');
+    var c = guardado();
+    if (c) { try { var r0 = await descifrar(cif, c, datosB64); cerrarForm(); return r0; } catch (e) {} }
+    var msg = '';
+    for (;;) {
+      var f = await formulario(msg), cc = cred(f.u, f.p);
+      try { var r = await descifrar(cif, cc, datosB64); guardar(cc, f.r); cerrarForm(); return r; }
+      catch (e) { msg = 'Usuario o contraseña incorrectos.'; var p = document.getElementById('dimcP'); if (p) p.value = ''; }
+    }
+  }
+  async function aTexto(u8, gz) { if (!gz) return new TextDecoder().decode(u8); return await new Response(new Blob([u8]).stream().pipeThrough(new DecompressionStream('gzip'))).text(); }
+  async function aGz(txt) { return new Uint8Array(await new Response(new Blob([txt]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()); }
+  return { cred: cred, cifrar: cifrar, nuevaLlave: nuevaLlave, abrir: abrir, salir: salir, aTexto: aTexto, aGz: aGz, aB64: aB64 };
+})();
+</script>
 </head>
 <body>
 <header>
@@ -131,7 +199,7 @@ td.ok .p{color:var(--okT)}td.mal .p{color:var(--malT)}td.top .p{color:var(--topT
   <div class="graf" id="graf"></div>
 </main>
 <script>
-(function () {
+window.__iniciar = (function () {
   var D = window.CAMP_DATOS;
   var $ = function (id) { return document.getElementById(id); };
   if (!D || !D.semanas || !D.semanas.length) { $('main').innerHTML = '<div class="card vacio">Todavía no hay datos del campeonato. Se cargan al publicar el tablero.</div>'; return; }
@@ -248,6 +316,10 @@ td.ok .p{color:var(--okT)}td.mal .p{color:var(--malT)}td.top .p{color:var(--topT
   $('bDesc').onclick = descargar;
   render();
   window.addEventListener('resize', function () { if (window.parent !== window) try { window.parent.postMessage({ campeonatoAlto: Math.ceil(document.body.getBoundingClientRect().height) }, '*'); } catch (e) {} });
+});
+(async function () {
+  if (window.CAMP_CIF) { try { window.CAMP_DATOS = JSON.parse(await DIMC_LOGIN.aTexto(await DIMC_LOGIN.abrir(window.CAMP_CIF), true)); } catch (e) { document.body.innerHTML = '<p style="font-family:Arial;padding:30px">No se pudieron abrir los datos: ' + e.message + '</p>'; return; } }
+  window.__iniciar();
 })();
 </script>
 </body>
