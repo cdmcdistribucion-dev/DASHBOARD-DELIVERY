@@ -158,6 +158,7 @@ h1{margin:6px 0 4px;font-size:30px;line-height:1.15;color:var(--tx)}
   const TROFEO = '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>';
   const TXT = { ok: 'En meta', warn: 'Cerca de la meta', bad: 'Fuera de meta', none: 'Sin meta' };
   const txtE = (k, v, s) => (v == null || !isFinite(v)) ? 'Sin datos' : TXT[s] + (k.meta != null ? ' · meta ' + fmt(k, k.meta) : '');
+  const KC = c => ({ nombre: 'Combustible (km/l)', fmt: 'num', dec: 2, mejor: 'alto', meta: c && c[1] != null ? c[1] : null, tol: 0 });   /* combustible: solo dato, no entra en el ranking */
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const ls = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} } };
   async function sha(t) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
@@ -215,7 +216,7 @@ h1{margin:6px 0 4px;font-size:30px;line-height:1.15;color:var(--tx)}
     const ki = gen ? D.kpis.length : D.kpis.findIndex(k => k.id === st.k), k = gen ? { id: 'general', nombre: 'Todos los indicadores', fmt: 'pts', mejor: 'alto', meta: null } : D.kpis[ki];
     if (!per || !k) { $('hero').innerHTML = '<div class="empty">Sin datos para este período.</div>'; $('misK').innerHTML = ''; $('lista').innerHTML = ''; return; }
     /* ranking igual al del dashboard: choferes con el mínimo de viajes del período, ordenados por el KPI elegido */
-    const filas = per.f.filter(r => r[3] >= per.min).map(r => ({ h: r[0], nom: r[1], ol: r[2], vj: r[3], v: r[4].slice() }));
+    const filas = per.f.filter(r => r[3] >= per.min).map(r => ({ h: r[0], nom: r[1], ol: r[2], vj: r[3], v: r[4].slice(), c: r[5] || null }));
     /* Todos los indicadores: puntaje 0-100 por KPI (el mejor 100, el peor 0) y promedio, igual que en el tablero */
     if (gen) { const ac = filas.map(() => [0, 0]);
       D.kpis.forEach((kk, j) => { const con = filas.map((x, i) => [i, x.v[j]]).filter(e => e[1] != null && isFinite(e[1])); if (con.length < 2) return;
@@ -225,12 +226,12 @@ h1{margin:6px 0 4px;font-size:30px;line-height:1.15;color:var(--tx)}
     filas.sort((a, b) => { const va = a.v[ki], vb = b.v[ki]; if (va == null) return 1; if (vb == null) return -1; return k.mejor === 'bajo' ? va - vb : vb - va; });
     filas.forEach((x, i) => x.pos = i + 1);
     const mio = filas.find(x => x.h === yo.h);
-    const mioTodo = mio || (per.f.find(r => r[0] === yo.h) ? (r => ({ h: r[0], nom: r[1], ol: r[2], vj: r[3], v: r[4] }))(per.f.find(r => r[0] === yo.h)) : null);
+    const mioTodo = mio || (per.f.find(r => r[0] === yo.h) ? (r => ({ h: r[0], nom: r[1], ol: r[2], vj: r[3], v: r[4], c: r[5] || null }))(per.f.find(r => r[0] === yo.h)) : null);
     const e = mio ? estado(k, mio.v[ki]) : 'none';
     $('hero').innerHTML = mio
       ? `<div class="lbl">${TROFEO}Mi posición · ${esc(k.nombre)}</div><div class="pos"><b>#${mio.pos}</b><span>de ${filas.length}</span></div><div class="meta"><b>${fmt(k, mio.v[ki])}</b>${gen ? ' de puntaje (100 = el mejor en todo)' : ' · ' + TXT[e] + (k.meta != null ? ' (meta ' + fmt(k, k.meta) + ')' : '')} · ${mio.vj} viajes</div>`
       : `<div class="lbl">${TROFEO}Mi posición · ${esc(k.nombre)}</div><div class="pos"><b>—</b></div><div class="meta">${mioTodo ? 'Tenés ' + mioTodo.vj + ' viajes: el ranking pide al menos ' + per.min + ' en este período.' : 'No tenés viajes en este período.'}</div>`;
-    $('misK').innerHTML = mioTodo ? D.kpis.map((kk, j) => kk.oculto ? '' : (() => { const v = mioTodo.v[j], s = estado(kk, v); return `<div class="card k ${s}"><div class="n">${esc(kk.nombre)}</div><div class="v">${fmt(kk, v)}</div><div class="m ${s}">${txtE(kk, v, s)}</div></div>`; })()).join('') : '<div class="empty" style="grid-column:1/-1">Sin datos tuyos en este período.</div>';
+    $('misK').innerHTML = mioTodo ? D.kpis.map((kk, j) => kk.oculto ? '' : (() => { const v = mioTodo.v[j], s = estado(kk, v); return `<div class="card k ${s}"><div class="n">${esc(kk.nombre)}</div><div class="v">${fmt(kk, v)}</div><div class="m ${s}">${txtE(kk, v, s)}</div></div>`; })()).join('') + (D.comb ? (() => { const c = mioTodo.c, kc = KC(c), v = c ? c[0] : null, s = estado(kc, v); return `<div class="card k ${s}"><div class="n">Combustible (km/l)</div><div class="v">${v == null ? '—' : fmt(kc, v) + ' km/l'}</div><div class="m ${s}">${v == null ? 'Sin cargas en este período' : TXT[s] + (kc.meta != null ? ' · meta ' + fmt(kc, kc.meta) + ' km/l' : '')}</div></div>`; })() : '') : '<div class="empty" style="grid-column:1/-1">Sin datos tuyos en este período.</div>';
     
     $('lista').innerHTML = filas.length ? filas.map(x => { const s = estado(k, x.v[ki]); return `<div class="row${x.pos <= 3 ? ' top3' : ''}${x.h === yo.h ? ' yo' : ''}${st.abierto === x.h ? ' open' : ''}" data-h="${x.h}"><div class="p">${x.pos}</div><div class="nm"><b>${esc(x.nom)}</b><small>${esc(x.ol)} · ${x.vj} viajes</small></div><div class="val">${fmt(k, x.v[ki])}<i class="dot ${s}"></i></div><div class="det">${D.kpis.map((kk, j) => kk.oculto ? '' : `<div><span>${esc(kk.nombre)}</span><b>${fmt(kk, x.v[j])}</b></div>`).join('')}</div></div>`; }).join('') : '<div class="empty">No hay choferes con el mínimo de viajes en este período.</div>';
     document.querySelectorAll('#lista .row').forEach(r => r.onclick = () => { st.abierto = st.abierto === r.dataset.h ? '' : r.dataset.h; render(); });
